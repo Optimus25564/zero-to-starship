@@ -3,13 +3,17 @@ import { LEVELS, defaultParams } from '../src/content/levels.js'
 import { evaluateLevel } from '../src/engine/evaluateLevel.js'
 
 describe('LEVELS 配置', () => {
-  it('恰好包含第一章三关，id 为 1.1 / 1.2 / 1.3', () => {
-    expect(LEVELS.map((l) => l.id)).toEqual(['1.1', '1.2', '1.3'])
+  it('包含第一章三关 + 第二章第一关，id 为 1.1 / 1.2 / 1.3 / 2.1', () => {
+    expect(LEVELS.map((l) => l.id)).toEqual(['1.1', '1.2', '1.3', '2.1'])
   })
-  it('每关都有目标文案与至少一个参数', () => {
+  it('每关都有目标文案，滑块型关卡至少有一个参数，选择型关卡至少有一个选项', () => {
     for (const l of LEVELS) {
       expect(typeof l.goal.text).toBe('string')
-      expect(l.params.length).toBeGreaterThan(0)
+      if (l.interaction === 'choice') {
+        expect(l.options.length).toBeGreaterThan(0)
+      } else {
+        expect(l.params.length).toBeGreaterThan(0)
+      }
     }
   })
   it('工具层层叠加：1.2 含 1.1 的参数，1.3 含 1.2 的参数', () => {

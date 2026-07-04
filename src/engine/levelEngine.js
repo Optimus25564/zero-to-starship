@@ -3,6 +3,7 @@ import { MILESTONES } from '../content/milestones.js'
 import { evaluateLevel } from './evaluateLevel.js'
 import { createProgression } from './progression.js'
 import { createSliderModule } from '../interaction/sliderModule.js'
+import { createChoiceModule } from '../interaction/choiceModule.js'
 import { createRocketScene } from '../scene/rocketScene.js'
 import { createBlueprintOverlay } from '../overlay/blueprintOverlay.js'
 import { createHud } from '../ui/hud.js'
@@ -12,7 +13,7 @@ export function startGame(mount) {
   const scene = createRocketScene(mount)
   const overlay = createBlueprintOverlay(mount)
 
-  let current, params, slider, hud
+  let current, params, interactionMod, hud
 
   function refresh() {
     const { derived } = evaluateLevel(current, params)
@@ -42,10 +43,12 @@ export function startGame(mount) {
       deltaV: derived.deltaV ?? null,
       goalMet,
     })
-    hud.setFeedback({
-      goalMet,
-      message: goalMet ? '达标！火箭表现符合目标。' : '还差一点，调整参数再试试。',
-    })
+    const message = goalMet
+      ? '达标！火箭表现符合目标。'
+      : current.interaction === 'choice'
+        ? `能飞——但${derived.chosen.note} 换一种再试试？`
+        : '还差一点，调整参数再试试。'
+    hud.setFeedback({ goalMet, message })
     if (goalMet) {
       const stars = starsFor(derived)
       progression.complete(current.id, stars)
@@ -58,7 +61,6 @@ export function startGame(mount) {
     const level = LEVELS.find((l) => l.id === id)
     if (!level) return
     current = level
-    params = defaultParams(level)
 
     if (hud) hud.reset()
     // 首次创建 HUD；之后复用同一个 HUD，仅重建滑块
@@ -74,11 +76,22 @@ export function startGame(mount) {
     hud.setHook(level.hook)
     hud.setGoal(level.goal.text)
 
-    if (slider) slider.destroy()
-    slider = createSliderModule(hud.slot, level.params, params, (v) => {
-      params = v
-      refresh()
-    })
+    if (interactionMod) interactionMod.destroy()
+    if (level.interaction === 'choice') {
+      params = { choice: level.options.find((o) => o.default)?.key ?? level.options[0].key }
+      interactionMod = createChoiceModule(
+        hud.slot,
+        level.options.map((o) => ({ key: o.key, label: o.label })),
+        params.choice,
+        (key) => { params = { choice: key }; refresh() },
+      )
+    } else {
+      params = defaultParams(level)
+      interactionMod = createSliderModule(hud.slot, level.params, params, (v) => {
+        params = v
+        refresh()
+      })
+    }
     refresh()
   }
 
