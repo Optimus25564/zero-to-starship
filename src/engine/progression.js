@@ -13,6 +13,7 @@ export function createProgression(levelIds) {
   }
 
   function complete(id, s) {
+    if (s < 1 || s > 3) return
     stars[id] = Math.max(stars[id] || 0, s)
   }
 

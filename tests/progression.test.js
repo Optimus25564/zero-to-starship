@@ -26,4 +26,10 @@ describe('progression', () => {
     p.complete('1.2', 1)
     expect(p.nextLockedUnlockedId()).toBe(null)
   })
+  it('越界星数（0）不记录，且不解锁下一关', () => {
+    const p = createProgression(['1.1', '1.2', '1.3'])
+    p.complete('1.1', 0)
+    expect(p.getStars('1.1')).toBe(0)
+    expect(p.isUnlocked('1.2')).toBe(false)
+  })
 })
