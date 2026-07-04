@@ -6,6 +6,7 @@ const Q_MAX = 600
 
 export const level = {
   id: '4.2',
+  phase: 'launch',
   title: '最大动压 Max-Q',
   hook: '火箭穿过稠密大气层时，速度和空气密度的乘积会先冲高再回落——那个峰值叫"最大动压"，简称 Max-Q。发射直播里那句"Max-Q，主机节流"，就是主控在这一刻把发动机拉低推力，怕结构被吹散。',
   params: [P.throttle],

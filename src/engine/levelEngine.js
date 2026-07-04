@@ -46,6 +46,7 @@ export function startGame(mount) {
       deltaV: derived.deltaV ?? null,
       goalMet,
     })
+    scene.play(goalMet) // 播发射/着陆动画
     const message = goalMet
       ? '达标！火箭表现符合目标。'
       : current.interaction === 'choice'
@@ -56,7 +57,9 @@ export function startGame(mount) {
       const stars = starsFor(derived)
       progression.complete(current.id, stars)
       const m = MILESTONES[current.milestoneId]
-      hud.showMilestone({ title: m.title, fact: m.fact, stars })
+      // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
+      const delay = current.phase === 'launch' || current.phase === 'landing' ? 1700 : 0
+      setTimeout(() => hud.showMilestone({ title: m.title, fact: m.fact, stars }), delay)
     }
   }
 
@@ -79,6 +82,7 @@ export function startGame(mount) {
     hud.setHook(level.hook)
     hud.setGoal(level.goal.text)
     diagram.setDiagram(level.diagram || null)
+    scene.setPhase(level.phase || 'pad')
 
     if (interactionMod) interactionMod.destroy()
     if (level.interaction === 'choice') {

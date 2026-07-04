@@ -169,26 +169,72 @@ export function createRocketScene(mount) {
   rocket.add(flame, glow)
 
   let state = { thrust: 0, twr: null, goalMet: false }
+  let phase = 'pad'   // 'pad'（静立）| 'launch'（起飞）| 'landing'（着陆回收）
+  let anim = null     // 播放中的动画：{ type, t }，type: launch/land-ok/land-fail
+  let rocketY = 0
   let running = true
   let time = 0
 
   function update(next) { state = { ...state, ...next } }
 
+  // 关卡加载时设定阶段：着陆关火箭起始在高空（下降姿态），其余在发射台
+  function setPhase(p) {
+    phase = p || 'pad'
+    anim = null
+    rocket.rotation.z = 0
+    rocketY = phase === 'landing' ? 8 : 0
+    rocket.position.y = rocketY
+  }
+
+  // 点"发射"时触发：起飞→升空飞走；着陆→软着陆或硬摔。每次先复位，便于重玩。
+  function play(success) {
+    rocket.rotation.z = 0
+    if (phase === 'launch') { rocketY = 0; anim = { type: 'launch', t: 0, vy: 0 } }
+    else if (phase === 'landing') { rocketY = 8; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 } }
+    else { rocketY = 0; anim = { type: 'pad-fire', t: 0 } }
+  }
+
   function tick() {
     if (!running) return
     requestAnimationFrame(tick)
     time += 0.016
-    const base = Math.max(0.2, ((state.thrust || 0) / 500000) * 3)
+
+    let flameThrust = state.thrust || 0
+    let bright = state.goalMet
+
+    if (anim) {
+      anim.t += 0.016
+      if (anim.type === 'launch') {
+        anim.vy = Math.min(anim.vy + 0.008, 0.22) // 逐渐加速，先慢后快
+        rocketY += anim.vy
+        flameThrust = 1000000; bright = true
+      } else if (anim.type === 'land-ok') {
+        rocketY += (0 - rocketY) * 0.035          // 平滑下降到发射台
+        flameThrust = rocketY > 0.15 ? 360000 : 0 // 触地即关机
+        bright = true
+      } else if (anim.type === 'land-fail') {
+        rocketY = Math.max(0, rocketY - 0.09)      // 掉得太快
+        flameThrust = 120000
+        if (rocketY <= 0) rocket.rotation.z = Math.min(rocket.rotation.z + 0.035, 1.3) // 触地翻倒
+      } else {
+        flameThrust = Math.max(flameThrust, 420000); bright = true // pad：焰亮一下
+      }
+    } else if (phase === 'landing') {
+      rocketY = 8; flameThrust = 300000            // 着陆关预览：高空 + 反推焰
+    } else if (state.twr != null && state.twr >= 1) {
+      rocketY = Math.min(rocketY + 0.02 * (state.twr - 1 + 0.1), 1.6)  // 起飞关预览：小幅抬升
+    } else if (state.twr != null) {
+      rocketY = 0
+    }
+
+    rocket.position.y = rocketY
+    const base = Math.max(0.2, (flameThrust / 500000) * 3)
     const flameLen = base * (1 + Math.sin(time * 22) * 0.06)
     flame.scale.set(1, flameLen, 1); flame.position.y = engineY - flameLen / 2
     glow.scale.set(1, flameLen * 1.15, 1); glow.position.y = engineY - flameLen * 0.575
-    flameMat.color.setHex(state.goalMet ? 0x9fdcff : 0xffb25a)
-    glowMat.color.setHex(state.goalMet ? 0x66ccff : 0xff7a1a)
-    if (state.twr != null && state.twr >= 1) {
-      rocket.position.y = Math.min(rocket.position.y + 0.02 * (state.twr - 1 + 0.1), 4)
-    } else if (state.twr != null) {
-      rocket.position.y = 0
-    }
+    flameMat.color.setHex(bright ? 0x9fdcff : 0xffb25a)
+    glowMat.color.setHex(bright ? 0x66ccff : 0xff7a1a)
+
     renderer.render(scene, camera)
   }
   tick()
@@ -209,5 +255,5 @@ export function createRocketScene(mount) {
     if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement)
   }
 
-  return { update, dispose }
+  return { update, setPhase, play, dispose }
 }

@@ -4,6 +4,7 @@ const P = {
 
 export const level = {
   id: '4.3',
+  phase: 'launch',
   title: '入轨=往旁边飞得够快',
   hook: '很多人以为"入轨"是飞得够高。其实真正的秘密是：往旁边飞得够快，快到你不断往下掉，却总也落不到地面上。',
   params: [P.horizontalV],
