@@ -4,6 +4,7 @@ import { evaluateLevel } from './evaluateLevel.js'
 import { createProgression } from './progression.js'
 import { createSliderModule } from '../interaction/sliderModule.js'
 import { createChoiceModule } from '../interaction/choiceModule.js'
+import { createSequenceModule } from '../interaction/sequenceModule.js'
 import { createRocketScene } from '../scene/rocketScene.js'
 import { createBlueprintOverlay } from '../overlay/blueprintOverlay.js'
 import { createHud } from '../ui/hud.js'
@@ -85,6 +86,12 @@ export function startGame(mount) {
         params.choice,
         (key) => { params = { choice: key }; refresh() },
       )
+    } else if (level.interaction === 'sequence') {
+      params = { order: [] }
+      interactionMod = createSequenceModule(hud.slot, level.steps, (order) => {
+        params = { order }
+        refresh()
+      })
     } else {
       params = defaultParams(level)
       interactionMod = createSliderModule(hud.slot, level.params, params, (v) => {
