@@ -15,6 +15,7 @@ export function startGame(mount) {
   const scene = createRocketScene(mount)
   const overlay = createBlueprintOverlay(mount)
   const diagram = createDiagramPanel(mount)
+  scene.setHoverHandler((over) => diagram.setHoverVisible(over))
 
   let current, params, interactionMod, hud
 

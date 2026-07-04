@@ -269,14 +269,32 @@ export function createRocketScene(mount) {
   }
   window.addEventListener('resize', onResize)
 
+  // 悬停射线检测：鼠标是否停在火箭上（用于浮出剖面构造）
+  const raycaster = new THREE.Raycaster()
+  const ndc = new THREE.Vector2()
+  let hoverHandler = null
+  let hoverWasOver = false
+  function onPointerMove(e) {
+    const rect = renderer.domElement.getBoundingClientRect()
+    if (!rect.width || !rect.height) return
+    ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+    ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.setFromCamera(ndc, camera)
+    const over = raycaster.intersectObject(rocket, true).length > 0
+    if (over !== hoverWasOver) { hoverWasOver = over; if (hoverHandler) hoverHandler(over) }
+  }
+  renderer.domElement.addEventListener('pointermove', onPointerMove)
+  function setHoverHandler(fn) { hoverHandler = fn }
+
   function dispose() {
     running = false
     window.removeEventListener('resize', onResize)
+    renderer.domElement.removeEventListener('pointermove', onPointerMove)
     scene.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose() })
     for (const d of disposables) d && d.dispose && d.dispose()
     renderer.dispose()
     if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement)
   }
 
-  return { update, setStage, play, setHighlight, dispose }
+  return { update, setStage, play, setHighlight, setHoverHandler, dispose }
 }
