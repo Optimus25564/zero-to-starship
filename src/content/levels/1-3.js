@@ -9,7 +9,7 @@ const P = {
 
 export const level = {
   id: '1.3',
-  phase: 'launch',
+  stage: 'ascent',
   title: '火箭方程',
   hook: '想飞得更快，就得带更多燃料；但燃料本身也有重量……这个死循环，齐奥尔科夫斯基用一个对数公式讲清楚了。',
   params: [P.exhaustVelocity, P.massFlow, P.totalMass, P.fuelFraction],

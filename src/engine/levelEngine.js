@@ -58,7 +58,7 @@ export function startGame(mount) {
       progression.complete(current.id, stars)
       const m = MILESTONES[current.milestoneId]
       // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-      const delay = current.phase === 'launch' || current.phase === 'landing' ? 1700 : 0
+      const delay = current.stage === 'liftoff' || current.stage === 'descent' ? 1700 : 0
       setTimeout(() => hud.showMilestone({ title: m.title, fact: m.fact, stars }), delay)
     }
   }
@@ -82,7 +82,7 @@ export function startGame(mount) {
     hud.setHook(level.hook)
     hud.setGoal(level.goal.text)
     diagram.setDiagram(level.diagram || null)
-    scene.setPhase(level.phase || 'pad')
+    scene.setStage(level.stage || 'pad')
 
     if (interactionMod) interactionMod.destroy()
     if (level.interaction === 'choice') {

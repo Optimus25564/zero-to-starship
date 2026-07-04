@@ -4,7 +4,7 @@ const P = {
 
 export const level = {
   id: '6.2',
-  phase: 'landing',
+  stage: 'descent',
   title: '再入走廊',
   hook: '阿波罗返回地球时,再入角只有几度的误差空间——太陡会被烧穿,太浅会像打水漂一样被大气弹回太空,再也回不来。',
   params: [P.reentryAngle],

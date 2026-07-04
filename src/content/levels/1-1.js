@@ -7,7 +7,7 @@ const P = {
 
 export const level = {
   id: '1.1',
-  phase: 'launch',
+  stage: 'pad',
   title: '推力从哪来',
   hook: '马斯克说，火箭最反直觉的地方，是它在真空里没有东西可"蹬"，却照样能加速。',
   params: [P.exhaustVelocity, P.massFlow],

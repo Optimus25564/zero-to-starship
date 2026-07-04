@@ -8,7 +8,7 @@ const P = {
 
 export const level = {
   id: '2.4',
-  phase: 'landing',
+  stage: 'descent',
   title: '深度节流：为着陆而生',
   hook: '猎鹰9号着陆时，发动机不是全力以赴，而是被"捏"到只剩三成推力——马斯克管这叫深度节流（deep throttling），固体火箭做不到，这也是液体发动机能垂直软着陆的关键。',
   params: [P.throttle],

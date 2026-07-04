@@ -169,28 +169,31 @@ export function createRocketScene(mount) {
   rocket.add(flame, glow)
 
   let state = { thrust: 0, twr: null, goalMet: false }
-  let phase = 'pad'   // 'pad'（静立）| 'launch'（起飞）| 'landing'（着陆回收）
-  let anim = null     // 播放中的动画：{ type, t }，type: launch/land-ok/land-fail
+  let stage = 'pad'   // 连续旅程的环节：'pad'台上 | 'liftoff'点火起飞 | 'ascent'飞行中 | 'descent'下降着陆
+  let anim = null
   let rocketY = 0
   let running = true
   let time = 0
 
   function update(next) { state = { ...state, ...next } }
 
-  // 关卡加载时设定阶段：着陆关火箭起始在高空（下降姿态），其余在发射台
-  function setPhase(p) {
-    phase = p || 'pad'
+  // 关卡加载时设定飞行阶段（连续旅程的一环，而非每关重新发射）
+  function setStage(s) {
+    stage = s || 'pad'
     anim = null
     rocket.rotation.z = 0
-    rocketY = phase === 'landing' ? 8 : 0
+    const airborne = stage === 'ascent'
+    ground.visible = pad.visible = tower.visible = !airborne  // 飞行中收起地面/发射塔
+    rocketY = stage === 'descent' ? 8 : airborne ? 2.4 : 0
     rocket.position.y = rocketY
   }
 
-  // 点"发射"时触发：起飞→升空飞走；着陆→软着陆或硬摔。每次先复位，便于重玩。
+  // 点"发射/继续"时触发：起飞→升空；飞行→加推力（不飞走）；下降→软着陆或硬摔
   function play(success) {
     rocket.rotation.z = 0
-    if (phase === 'launch') { rocketY = 0; anim = { type: 'launch', t: 0, vy: 0 } }
-    else if (phase === 'landing') { rocketY = 8; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 } }
+    if (stage === 'liftoff') { rocketY = 0; anim = { type: 'launch', t: 0, vy: 0 } }
+    else if (stage === 'descent') { rocketY = 8; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 } }
+    else if (stage === 'ascent') { anim = { type: 'boost', t: 0 } }
     else { rocketY = 0; anim = { type: 'pad-fire', t: 0 } }
   }
 
@@ -216,11 +219,18 @@ export function createRocketScene(mount) {
         rocketY = Math.max(0, rocketY - 0.09)      // 掉得太快
         flameThrust = 120000
         if (rocketY <= 0) rocket.rotation.z = Math.min(rocket.rotation.z + 0.035, 1.3) // 触地翻倒
+      } else if (anim.type === 'boost') {
+        rocketY = 2.4 + Math.sin(time * 2) * 0.12  // 飞行中加推：短暂增焰后回巡航
+        flameThrust = anim.t < 1.4 ? 900000 : 520000
+        bright = anim.t < 1.4
       } else {
         flameThrust = Math.max(flameThrust, 420000); bright = true // pad：焰亮一下
       }
-    } else if (phase === 'landing') {
-      rocketY = 8; flameThrust = 300000            // 着陆关预览：高空 + 反推焰
+    } else if (stage === 'ascent') {
+      rocketY = 2.4 + Math.sin(time * 2) * 0.12    // 飞行中：巡航高度轻微起伏 + 持续喷焰
+      flameThrust = Math.max(flameThrust, 520000)
+    } else if (stage === 'descent') {
+      rocketY = 8; flameThrust = 300000            // 下降关预览：高空 + 反推焰
     } else if (state.twr != null && state.twr >= 1) {
       rocketY = Math.min(rocketY + 0.02 * (state.twr - 1 + 0.1), 1.6)  // 起飞关预览：小幅抬升
     } else if (state.twr != null) {
@@ -255,5 +265,5 @@ export function createRocketScene(mount) {
     if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement)
   }
 
-  return { update, setPhase, play, dispose }
+  return { update, setStage, play, dispose }
 }

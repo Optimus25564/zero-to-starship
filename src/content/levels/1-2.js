@@ -8,7 +8,7 @@ const P = {
 
 export const level = {
   id: '1.2',
-  phase: 'launch',
+  stage: 'liftoff',
   title: '推重比 TWR',
   hook: '光有大推力还不够——如果火箭比自己产生的推力还重，它只会趴在发射台上纹丝不动。',
   params: [P.exhaustVelocity, P.massFlow, P.totalMass],
