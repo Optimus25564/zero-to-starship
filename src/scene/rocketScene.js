@@ -208,7 +208,7 @@ export function createRocketScene(mount) {
     if (anim) {
       anim.t += 0.016
       if (anim.type === 'launch') {
-        anim.vy = Math.min(anim.vy + 0.0022, 0.085) // 缓缓离地、越升越快（庄重感）
+        anim.vy = Math.min(anim.vy + 0.00035, 0.036) // 缓缓离地、越升越快，约 6 秒爬出画面
         rocketY += anim.vy
         flameThrust = 1000000; bright = true
       } else if (anim.type === 'land-ok') {
