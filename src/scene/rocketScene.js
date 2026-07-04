@@ -168,6 +168,13 @@ export function createRocketScene(mount) {
   flame.position.y = engineY; glow.position.y = engineY
   rocket.add(flame, glow)
 
+  // 部件高亮环：标出某个部件在火箭上的位置（发动机/贮箱/鼻锥）
+  const hlMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
+  const highlight = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.06, 12, 44), hlMat)
+  highlight.rotation.x = Math.PI / 2
+  highlight.visible = false
+  rocket.add(highlight)
+
   let state = { thrust: 0, twr: null, goalMet: false }
   let stage = 'pad'   // 连续旅程的环节：'pad'台上 | 'liftoff'点火起飞 | 'ascent'飞行中 | 'descent'下降着陆
   let anim = null
@@ -176,6 +183,13 @@ export function createRocketScene(mount) {
   let time = 0
 
   function update(next) { state = { ...state, ...next } }
+
+  // 高亮某部件在火箭上的位置（'engine' | 'tanks' | 'nose' | null）
+  function setHighlight(part) {
+    const y = part === 'engine' ? 0.8 : part === 'tanks' ? 3 : part === 'nose' ? 6 : null
+    highlight.visible = y != null
+    if (y != null) highlight.position.y = y
+  }
 
   // 关卡加载时设定飞行阶段（连续旅程的一环，而非每关重新发射）
   function setStage(s) {
@@ -242,6 +256,7 @@ export function createRocketScene(mount) {
     glow.scale.set(1, flameLen * 1.15, 1); glow.position.y = engineY - flameLen * 0.575
     flameMat.color.setHex(bright ? 0x9fdcff : 0xffb25a)
     glowMat.color.setHex(bright ? 0x66ccff : 0xff7a1a)
+    if (highlight.visible) hlMat.opacity = 0.35 + (Math.sin(time * 4) + 1) * 0.25 // 脉冲
 
     renderer.render(scene, camera)
   }
@@ -263,5 +278,5 @@ export function createRocketScene(mount) {
     if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement)
   }
 
-  return { update, setStage, play, dispose }
+  return { update, setStage, play, setHighlight, dispose }
 }

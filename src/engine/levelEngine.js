@@ -83,6 +83,7 @@ export function startGame(mount) {
     hud.setGoal(level.goal.text)
     diagram.setDiagram(level.diagram || null)
     scene.setStage(level.stage || 'pad')
+    scene.setHighlight(level.highlight || null)
 
     if (interactionMod) interactionMod.destroy()
     if (level.interaction === 'choice') {
