@@ -212,8 +212,8 @@ export function createRocketScene(mount) {
         rocketY += anim.vy
         flameThrust = 1000000; bright = true
       } else if (anim.type === 'land-ok') {
-        rocketY += (0 - rocketY) * 0.035          // 平滑下降到发射台
-        flameThrust = rocketY > 0.15 ? 360000 : 0 // 触地即关机
+        rocketY = Math.max(0, rocketY - 0.024)    // 缓慢匀速下降，约 5-6 秒软着陆
+        flameThrust = rocketY > 0.12 ? 360000 : 0 // 触地即关机
         bright = true
       } else if (anim.type === 'land-fail') {
         rocketY = Math.max(0, rocketY - 0.09)      // 掉得太快
