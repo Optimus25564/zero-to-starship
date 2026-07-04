@@ -16,6 +16,29 @@ export const level = {
   },
   goal: { text: '为一艘要"反复使用、还要飞往火星"的飞船，选出最合适的推进剂', check: (d) => d.isBest },
   formulaHUD: (p, d) => `比冲 Isp ${d.chosen.isp}s · 密度 ${d.chosen.density} · 复用友好 ${d.chosen.reuse} · 火星可造 ${d.chosen.mars}`,
+  diagram: {
+    title: '液体燃料 · 双贮箱构造',
+    svg: `<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
+      <defs><marker id="a21" markerWidth="9" markerHeight="9" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9fd0ff"/></marker></defs>
+      <g transform="translate(230,0)">
+        <polygon points="0,20 -34,96 34,96" fill="#dfe4ea" stroke="#8b939c"/>
+        <rect x="-34" y="96" width="68" height="250" rx="4" fill="#182238" stroke="#8b939c" stroke-width="2"/>
+        <rect x="-30" y="104" width="60" height="104" rx="6" fill="#4f86c6"/>
+        <rect x="-30" y="216" width="60" height="110" rx="6" fill="#d99a44"/>
+        <polygon points="-30,346 30,346 20,376 -20,376" fill="#2c2f35" stroke="#8b939c"/>
+        <line x1="0" y1="208" x2="0" y2="216" stroke="#9fd0ff" marker-end="url(#a21)"/>
+        <line x1="-16" y1="326" x2="-10" y2="348" stroke="#ffb25a" marker-end="url(#a21)"/>
+        <line x1="16" y1="326" x2="10" y2="348" stroke="#ffb25a" marker-end="url(#a21)"/>
+      </g>
+      <g font-size="14" fill="#e6ebf2">
+        <line x1="264" y1="150" x2="360" y2="140" stroke="#6a7684"/><text x="364" y="144">氧化剂罐（液氧）</text>
+        <line x1="264" y1="270" x2="360" y2="266" stroke="#6a7684"/><text x="364" y="270">燃料罐（甲烷/煤油）</text>
+        <line x1="256" y1="360" x2="360" y2="366" stroke="#6a7684"/><text x="364" y="370">涡轮泵 + 发动机</text>
+      </g>
+      <text x="30" y="360" fill="#9fd0ff" font-size="12">真空里没有空气可烧，</text>
+      <text x="30" y="378" fill="#9fd0ff" font-size="12">火箭必须自带氧化剂 → 两个罐子</text>
+    </svg>`,
+  },
   milestoneId: 'starship-methane',
 }
 
