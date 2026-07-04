@@ -148,15 +148,18 @@ export function createRocketScene(mount) {
   const flapGeo = new THREE.BoxGeometry(0.09, 1.6, 1.0)
   const flapL = new THREE.Mesh(flapGeo, steel); flapL.position.set(-0.56, 1.6, 0.05); flapL.rotation.z = 0.16
   const flapR = new THREE.Mesh(flapGeo, steel); flapR.position.set(0.56, 1.6, 0.05); flapR.rotation.z = -0.16
+  body.userData.part = 'body'; nose.userData.part = 'nose'
+  skirt.userData.part = 'engine'; band.userData.part = 'body'
+  flapL.userData.part = 'flap'; flapR.userData.part = 'flap'
   rocket.add(body, nose, skirt, band, flapL, flapR)
   // 发动机群（裙底的一圈喷管）
   const nozGeo = new THREE.CylinderGeometry(0.1, 0.17, 0.4, 20)
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2
-    const n = new THREE.Mesh(nozGeo, darkSteel)
+    const n = new THREE.Mesh(nozGeo, darkSteel); n.userData.part = 'engine'
     n.position.set(Math.cos(a) * 0.32, 0.32, Math.sin(a) * 0.32); rocket.add(n)
   }
-  const nozC = new THREE.Mesh(nozGeo, darkSteel); nozC.position.set(0, 0.32, 0); rocket.add(nozC)
+  const nozC = new THREE.Mesh(nozGeo, darkSteel); nozC.userData.part = 'engine'; nozC.position.set(0, 0.32, 0); rocket.add(nozC)
   scene.add(rocket)
 
   // ---- 尾焰 ----
@@ -184,11 +187,18 @@ export function createRocketScene(mount) {
 
   function update(next) { state = { ...state, ...next } }
 
-  // 高亮某部件在火箭上的位置（'engine' | 'tanks' | 'nose' | null）
+  // 各部件在火箭上的位置与说明（用于鼠标划过就地标注）
+  const PARTS = {
+    nose: { name: '鼻锥 / 载荷舱', desc: '装卫星或飞船', y: 6 },
+    oxtank: { name: '氧化剂罐（液氧）', desc: '真空没空气，火箭自带氧化剂', y: 4.3 },
+    fueltank: { name: '燃料罐（液甲烷）', desc: '燃料，与氧化剂分罐储存', y: 1.9 },
+    flap: { name: '后襟翼', desc: '再入时像跳伞一样控制姿态', y: 2 },
+    engine: { name: '发动机（猛禽）', desc: '液氧甲烷、可深度节流', y: 0.7 },
+  }
+  let baseHighlight = null   // 本关聚焦部件（无悬停时脉动）
+  let hoverPart = null       // 当前鼠标划到的部件
   function setHighlight(part) {
-    const y = part === 'engine' ? 0.8 : part === 'tanks' ? 3 : part === 'nose' ? 6 : null
-    highlight.visible = y != null
-    if (y != null) highlight.position.y = y
+    baseHighlight = part === 'tanks' ? 'fueltank' : (PARTS[part] ? part : null)
   }
 
   // 关卡加载时设定飞行阶段（连续旅程的一环，而非每关重新发射）
@@ -256,7 +266,15 @@ export function createRocketScene(mount) {
     glow.scale.set(1, flameLen * 1.15, 1); glow.position.y = engineY - flameLen * 0.575
     flameMat.color.setHex(bright ? 0x9fdcff : 0xffb25a)
     glowMat.color.setHex(bright ? 0x66ccff : 0xff7a1a)
-    if (highlight.visible) hlMat.opacity = 0.35 + (Math.sin(time * 4) + 1) * 0.25 // 脉冲
+    // 高亮环跟随：优先划过的部件，否则本关聚焦部件（脉动）
+    const ringKey = hoverPart || baseHighlight
+    if (ringKey && PARTS[ringKey]) {
+      highlight.visible = true
+      highlight.position.y = PARTS[ringKey].y
+      hlMat.opacity = hoverPart ? 0.85 : 0.35 + (Math.sin(time * 4) + 1) * 0.25
+    } else {
+      highlight.visible = false
+    }
 
     renderer.render(scene, camera)
   }
@@ -273,15 +291,23 @@ export function createRocketScene(mount) {
   const raycaster = new THREE.Raycaster()
   const ndc = new THREE.Vector2()
   let hoverHandler = null
-  let hoverWasOver = false
+  function partAt(obj, point) {
+    const p = obj.userData && obj.userData.part
+    if (p === 'nose' || p === 'flap' || p === 'engine') return p
+    if (p === 'body') return point.y - rocket.position.y > 3 ? 'oxtank' : 'fueltank' // 身筒上半=氧化剂罐，下半=燃料罐
+    return null
+  }
   function onPointerMove(e) {
     const rect = renderer.domElement.getBoundingClientRect()
     if (!rect.width || !rect.height) return
     ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
     ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(ndc, camera)
-    const over = raycaster.intersectObject(rocket, true).length > 0
-    if (over !== hoverWasOver) { hoverWasOver = over; if (hoverHandler) hoverHandler(over) }
+    const hits = raycaster.intersectObject(rocket, true)
+    let key = null
+    for (const h of hits) { key = partAt(h.object, h.point); if (key) break }
+    hoverPart = key
+    if (hoverHandler) hoverHandler(key ? { ...PARTS[key], x: e.clientX, y: e.clientY } : null)
   }
   renderer.domElement.addEventListener('pointermove', onPointerMove)
   function setHoverHandler(fn) { hoverHandler = fn }

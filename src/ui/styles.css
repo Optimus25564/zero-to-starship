@@ -42,6 +42,11 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .diagram-panel.hidden { transform: translateX(103%); }
 .diagram-title { font-weight: 600; font-size: 16px; margin-bottom: 10px; color: #e6ebf2; }
 .diagram-body svg { display: block; width: 100%; height: auto; }
+.part-label { position: fixed; transform: translate(16px, -50%); background: rgba(9,14,26,.95); border: 1px solid #66ddff; border-radius: 8px; padding: 7px 12px; pointer-events: none; z-index: 20; white-space: nowrap; }
+.part-label.hidden { display: none; }
+.part-label b { display: block; font-size: 13px; color: #eaf7ff; }
+.part-label span { display: block; font-size: 11px; color: #9fc0d4; margin-top: 2px; }
+
 .d3d-wrap { width: 100%; min-height: 300px; display: flex; justify-content: center; align-items: center; }
 .d3d-legend { margin-top: 12px; font-size: 13px; color: #bcd0e6; line-height: 1.7; text-align: center; }
 .d3d-legend b { color: #eaf2ff; }

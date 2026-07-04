@@ -8,14 +8,14 @@ import { createSequenceModule } from '../interaction/sequenceModule.js'
 import { createRocketScene } from '../scene/rocketScene.js'
 import { createBlueprintOverlay } from '../overlay/blueprintOverlay.js'
 import { createHud } from '../ui/hud.js'
-import { createDiagramPanel } from '../ui/diagramPanel.js'
+import { createPartLabel } from '../ui/partLabel.js'
 
 export function startGame(mount) {
   const progression = createProgression(LEVELS.map((l) => l.id))
   const scene = createRocketScene(mount)
   const overlay = createBlueprintOverlay(mount)
-  const diagram = createDiagramPanel(mount)
-  scene.setHoverHandler((over) => diagram.setHoverVisible(over))
+  const partLabel = createPartLabel(mount)
+  scene.setHoverHandler((info) => (info ? partLabel.show(info) : partLabel.hide()))
 
   let current, params, interactionMod, hud
 
@@ -82,7 +82,6 @@ export function startGame(mount) {
     }
     hud.setHook(level.hook)
     hud.setGoal(level.goal.text)
-    diagram.setDiagram(level.diagram || null)
     scene.setStage(level.stage || 'pad')
     scene.setHighlight(level.highlight || null)
 
@@ -114,6 +113,6 @@ export function startGame(mount) {
   loadLevel(progression.nextLockedUnlockedId())
 
   return {
-    dispose: () => { scene.dispose(); overlay.dispose(); diagram.destroy() },
+    dispose: () => { scene.dispose(); overlay.dispose(); partLabel.destroy() },
   }
 }
