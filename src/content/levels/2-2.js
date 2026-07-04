@@ -5,6 +5,7 @@ const P = {
 
 export const level = {
   id: '2.2',
+  stage: 'descent',
   title: '燃烧室与喷管',
   hook: '燃烧室里的燃气又热又高压，但真正决定火箭飞多快的，是喷管怎么把这团混乱的气体，捏成一股笔直高速的气流喷出去。',
   params: [P.chamberPressure, P.expansionRatio],

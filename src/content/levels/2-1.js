@@ -6,6 +6,7 @@ const PROPELLANTS = [
 
 export const level = {
   id: '2.1',
+  stage: 'ascent',
   title: '推进剂之选：液体燃料',
   interaction: 'choice',
   hook: '火箭在真空里没有空气可烧，所以必须自带"氧化剂"——液体燃料火箭把燃料和氧化剂分成两个大罐、用泵抽进燃烧室。选哪种组合，决定了它能飞多远、好不好回收。',
