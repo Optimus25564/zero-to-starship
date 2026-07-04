@@ -114,8 +114,8 @@ export function createRocketScene(mount) {
     }
     // 筷子夹：两条伸向火箭的横臂
     const arm = new THREE.BoxGeometry(3.4, 0.26, 0.4)
-    const a1 = new THREE.Mesh(arm, towerMat); a1.position.set(bx + 1.7, 5.4, 0.55); t.add(a1)
-    const a2 = new THREE.Mesh(arm, towerMat); a2.position.set(bx + 1.7, 5.4, -0.55); t.add(a2)
+    const a1 = new THREE.Mesh(arm, towerMat); a1.position.set(bx + 1.7, 8, 0.62); t.add(a1)
+    const a2 = new THREE.Mesh(arm, towerMat); a2.position.set(bx + 1.7, 8, -0.62); t.add(a2)
     return t
   }
   const tower = makeTower(); tower.position.set(-3.7, 0, -0.2); scene.add(tower)
@@ -184,7 +184,7 @@ export function createRocketScene(mount) {
     rocket.rotation.z = 0
     const airborne = stage === 'ascent'
     ground.visible = pad.visible = tower.visible = !airborne  // 飞行中收起地面/发射塔
-    rocketY = stage === 'descent' ? 8 : airborne ? 2.4 : 0
+    rocketY = stage === 'descent' ? 12 : airborne ? 2.4 : 0   // 下降关：从高空回来
     rocket.position.y = rocketY
   }
 
@@ -192,7 +192,7 @@ export function createRocketScene(mount) {
   function play(success) {
     rocket.rotation.z = 0
     if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
-    else if (stage === 'descent') { rocketY = 8; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 } }
+    else if (stage === 'descent') { rocketY = 12; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 } }
     else if (stage === 'ascent') { anim = { type: 'boost', t: 0 } }
     else { rocketY = 0; anim = { type: 'pad-fire', t: 0 } }
   }
@@ -212,8 +212,8 @@ export function createRocketScene(mount) {
         rocketY += anim.vy
         flameThrust = 1000000; bright = true
       } else if (anim.type === 'land-ok') {
-        rocketY = Math.max(0, rocketY - 0.024)    // 缓慢匀速下降，约 5-6 秒软着陆
-        flameThrust = rocketY > 0.12 ? 360000 : 0 // 触地即关机
+        rocketY = Math.max(3, rocketY - 0.026)    // 从高空缓降到筷子臂高度被夹住（约 6 秒）
+        flameThrust = rocketY > 3.3 ? 360000 : 0  // 接近夹持点即关机，靠机械臂夹住
         bright = true
       } else if (anim.type === 'land-fail') {
         rocketY = Math.max(0, rocketY - 0.09)      // 掉得太快
