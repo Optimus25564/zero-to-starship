@@ -139,15 +139,15 @@ export function createRocketScene(mount) {
   const steelTex = makeSteelTexture(); disposables.push(steelTex)
   const rocket = new THREE.Group()
   const steel = new THREE.MeshStandardMaterial({ map: steelTex, color: 0xf0f3f7, metalness: 0.92, roughness: 0.2, envMapIntensity: 1.5 })
-  const steelPlain = new THREE.MeshStandardMaterial({ color: 0xdde2e8, metalness: 0.92, roughness: 0.2, envMapIntensity: 1.5 })
   const darkSteel = new THREE.MeshStandardMaterial({ color: 0x2c2f35, metalness: 0.8, roughness: 0.45, envMapIntensity: 1.2 })
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 5, 72), steel); body.position.y = 3
   const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.6, 1.7, 72), steel); nose.position.y = 6.35
   const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, 0.7, 72), darkSteel); skirt.position.y = 0.82
   const band = new THREE.Mesh(new THREE.CylinderGeometry(0.606, 0.606, 0.16, 72), darkSteel); band.position.y = 4.7
-  const flapGeo = new THREE.BoxGeometry(0.1, 1.1, 0.72)
-  const flapTop = new THREE.Mesh(flapGeo, steelPlain); flapTop.position.set(0.66, 5.5, 0)
-  const flapBot = new THREE.Mesh(flapGeo, steelPlain); flapBot.position.set(-0.66, 1.55, 0)
+  // 星舰襟翼（前襟靠上、后襟靠下，同侧，做成贴合船身的鳍状）
+  const flapGeo = new THREE.BoxGeometry(0.14, 1.35, 0.5)
+  const flapTop = new THREE.Mesh(flapGeo, steel); flapTop.position.set(0.6, 5.4, 0.28); flapTop.rotation.z = -0.12
+  const flapBot = new THREE.Mesh(flapGeo, steel); flapBot.position.set(0.6, 1.5, 0.28); flapBot.rotation.z = 0.12
   rocket.add(body, nose, skirt, band, flapTop, flapBot)
   // 发动机群（裙底的一圈喷管）
   const nozGeo = new THREE.CylinderGeometry(0.1, 0.17, 0.4, 20)
@@ -189,7 +189,6 @@ export function createRocketScene(mount) {
     } else if (state.twr != null) {
       rocket.position.y = 0
     }
-    rocket.rotation.y += 0.0014
     renderer.render(scene, camera)
   }
   tick()
