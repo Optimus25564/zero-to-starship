@@ -18,7 +18,7 @@ export function startGame(mount) {
     const { derived } = evaluateLevel(current, params)
     scene.update({
       thrust: derived.thrust ?? 0,
-      twr: derived.twr ?? null,
+      twr: derived.twr ?? 0,
       deltaV: derived.deltaV ?? null,
       goalMet: false,
     })
@@ -38,7 +38,7 @@ export function startGame(mount) {
     const { derived, goalMet } = evaluateLevel(current, params)
     scene.update({
       thrust: derived.thrust ?? 0,
-      twr: derived.twr ?? null,
+      twr: derived.twr ?? 0,
       deltaV: derived.deltaV ?? null,
       goalMet,
     })
