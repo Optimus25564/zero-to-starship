@@ -78,6 +78,10 @@ export function createRocketScene(mount) {
 
   function dispose() {
     running = false
+    scene.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose()
+      if (obj.material) obj.material.dispose()
+    })
     renderer.dispose()
     if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement)
   }
