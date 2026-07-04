@@ -1,19 +1,40 @@
 import { describe, it, expect } from 'vitest'
 import { LEVELS, defaultParams } from '../src/content/levels.js'
+import { MILESTONES } from '../src/content/milestones.js'
 import { evaluateLevel } from '../src/engine/evaluateLevel.js'
 
+const cmpId = (a, b) => {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) - (pb[i] || 0)
+  }
+  return 0
+}
+
 describe('LEVELS 配置', () => {
-  it('包含第一章三关 + 第二章第一关，id 为 1.1 / 1.2 / 1.3 / 2.1', () => {
-    expect(LEVELS.map((l) => l.id)).toEqual(['1.1', '1.2', '1.3', '2.1'])
+  it('包含既有核心关卡，且按数值 id 升序排列', () => {
+    const ids = LEVELS.map((l) => l.id)
+    for (const core of ['1.1', '1.2', '1.3', '2.1']) expect(ids).toContain(core)
+    expect(ids).toEqual([...ids].sort(cmpId))
   })
-  it('每关都有目标文案，滑块型关卡至少有一个参数，选择型关卡至少有一个选项', () => {
+  it('每关都有目标文案，且按交互类型具备对应字段', () => {
     for (const l of LEVELS) {
       expect(typeof l.goal.text).toBe('string')
+      expect(typeof l.formulaHUD).toBe('function')
+      expect(typeof l.goal.check).toBe('function')
       if (l.interaction === 'choice') {
         expect(l.options.length).toBeGreaterThan(0)
+      } else if (l.interaction === 'sequence') {
+        expect(l.steps.length).toBeGreaterThan(0)
       } else {
         expect(l.params.length).toBeGreaterThan(0)
       }
+    }
+  })
+  it('每关的 milestoneId 都能在 MILESTONES 找到对应条目', () => {
+    for (const l of LEVELS) {
+      expect(MILESTONES[l.milestoneId], `缺少里程碑：${l.id} -> ${l.milestoneId}`).toBeTruthy()
     }
   })
   it('工具层层叠加：1.2 含 1.1 的参数，1.3 含 1.2 的参数', () => {
