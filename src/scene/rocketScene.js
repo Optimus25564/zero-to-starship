@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
-// SpaceX 实拍观感的火箭场景（稳健渲染路径：LDR 天空 + 标准光照 + 环境反射，无 HDR/泛光）。
-// 明亮日晴天空 + 太阳 + 反射天空的明亮不锈钢 + 真实混凝土发射台。
+// SpaceX 实拍观感（金色黄昏）：低角度英雄镜头 + 发射塔/筷子夹 + 反射暖色天空的不锈钢星舰。
+// 稳健渲染路径：LDR 等距柱状天空 + 环境反射 + 标准光照（无 HDR/泛光，不会白屏）。
 // 对外契约不变：createRocketScene(mount) -> { update(state), dispose() }
 // state: { thrust, twr, deltaV, goalMet }
 export function createRocketScene(mount) {
@@ -12,43 +12,43 @@ export function createRocketScene(mount) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setSize(W, H)
   renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.0
+  renderer.toneMappingExposure = 0.98
   mount.appendChild(renderer.domElement)
 
   const scene = new THREE.Scene()
-  const hazeColor = new THREE.Color(0xbfd8ee)
-  scene.fog = new THREE.Fog(hazeColor, 55, 340)
+  scene.fog = new THREE.Fog(new THREE.Color(0xcf9a5e), 60, 380)
 
-  const camera = new THREE.PerspectiveCamera(42, W / H, 0.1, 3000)
-  camera.position.set(4.6, 2.9, 12.5)
-  camera.lookAt(0, 3.2, 0)
+  // 低角度英雄镜头，仰视火箭
+  const camera = new THREE.PerspectiveCamera(43, W / H, 0.1, 3000)
+  camera.position.set(5.4, 1.1, 12.5)
+  camera.lookAt(0, 4.2, 0)
 
   const disposables = []
 
-  // ---- 天空贴图：等距柱状(equirect) 画布，竖直渐变 + 一个柔和的太阳 ----
-  const sunDir = new THREE.Vector3(0.55, 0.6, 0.58).normalize()
+  // ---- 金色黄昏天空（等距柱状画布：竖直渐变 + 低垂暖阳）----
+  const sunDir = new THREE.Vector3(0.62, 0.2, -0.28).normalize()
   function makeSkyTexture() {
     const cw = 1024, ch = 512
     const c = document.createElement('canvas'); c.width = cw; c.height = ch
     const ctx = c.getContext('2d')
     const g = ctx.createLinearGradient(0, 0, 0, ch)
-    g.addColorStop(0.00, '#1e5aa8') // 天顶：较深的晴空蓝
-    g.addColorStop(0.42, '#3f86cf')
-    g.addColorStop(0.72, '#7fb4e6')
-    g.addColorStop(0.90, '#b9d9f2') // 地平线上方
-    g.addColorStop(1.00, '#dcecf8') // 地平线薄雾
+    g.addColorStop(0.00, '#33356a') // 天顶：暮蓝紫（留一点冷色对比）
+    g.addColorStop(0.34, '#7a5570')
+    g.addColorStop(0.54, '#bf7148') // 暖橙
+    g.addColorStop(0.72, '#e59a4a') // 琥珀
+    g.addColorStop(0.88, '#f6c266') // 金
+    g.addColorStop(1.00, '#fce3a6') // 地平线金辉
     ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch)
-    // 太阳：把方向映射到等距柱状 uv
     const u = 0.5 + Math.atan2(sunDir.x, sunDir.z) / (2 * Math.PI)
     const v = 0.5 - Math.asin(THREE.MathUtils.clamp(sunDir.y, -1, 1)) / Math.PI
     const sx = u * cw, sy = v * ch
-    const halo = ctx.createRadialGradient(sx, sy, 0, sx, sy, 190)
-    halo.addColorStop(0, 'rgba(255,252,245,0.95)')
-    halo.addColorStop(0.18, 'rgba(255,247,230,0.55)')
-    halo.addColorStop(0.5, 'rgba(255,244,225,0.14)')
-    halo.addColorStop(1, 'rgba(255,244,225,0)')
-    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx, sy, 190, 0, 7); ctx.fill()
-    ctx.fillStyle = 'rgba(255,255,252,1)'; ctx.beginPath(); ctx.arc(sx, sy, 26, 0, 7); ctx.fill()
+    const halo = ctx.createRadialGradient(sx, sy, 0, sx, sy, 260)
+    halo.addColorStop(0, 'rgba(255,244,214,0.98)')
+    halo.addColorStop(0.14, 'rgba(255,226,168,0.7)')
+    halo.addColorStop(0.42, 'rgba(255,196,120,0.22)')
+    halo.addColorStop(1, 'rgba(255,196,120,0)')
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(sx, sy, 260, 0, 7); ctx.fill()
+    ctx.fillStyle = 'rgba(255,250,235,1)'; ctx.beginPath(); ctx.arc(sx, sy, 34, 0, 7); ctx.fill()
     const tex = new THREE.CanvasTexture(c)
     tex.colorSpace = THREE.SRGBColorSpace
     tex.mapping = THREE.EquirectangularReflectionMapping
@@ -57,96 +57,114 @@ export function createRocketScene(mount) {
   const skyTex = makeSkyTexture()
   disposables.push(skyTex)
   scene.background = skyTex
-
-  // 环境贴图：让不锈钢反射真实天空（金属"亮起来"的关键）
   try {
     const pmrem = new THREE.PMREMGenerator(renderer)
     const envRT = pmrem.fromEquirectangular(skyTex)
     scene.environment = envRT.texture
     disposables.push(envRT, pmrem)
-  } catch (e) {
-    console.warn('env map skipped:', e)
-  }
+  } catch (e) { console.warn('env map skipped:', e) }
 
-  // ---- 光照：与太阳一致的强暖光 + 天空/地面半球光 ----
-  const sun = new THREE.DirectionalLight(0xfff4e2, 3.4)
+  // ---- 光照：低垂暖阳 + 暮色半球光 ----
+  const sun = new THREE.DirectionalLight(0xffcf9a, 3.2)
   sun.position.copy(sunDir).multiplyScalar(60)
   scene.add(sun)
-  scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x55503f, 1.0))
+  scene.add(new THREE.HemisphereLight(0x8a86b0, 0x4a3a2c, 0.75))
 
-  // ---- 发射台地面（较亮的混凝土，向地平线雾化，消除硬边）----
+  // ---- 混凝土发射台（暖光下，向地平线金辉雾化）----
   function makeConcrete() {
     const c = document.createElement('canvas'); c.width = 256; c.height = 256
     const ctx = c.getContext('2d')
-    ctx.fillStyle = '#8b9096'; ctx.fillRect(0, 0, 256, 256)
+    ctx.fillStyle = '#7c766e'; ctx.fillRect(0, 0, 256, 256)
     for (let i = 0; i < 2600; i++) {
-      const g = 110 + Math.floor(Math.random() * 46)
-      ctx.fillStyle = `rgba(${g},${g + 3},${g + 8},0.5)`
+      const g = 95 + Math.floor(Math.random() * 42)
+      ctx.fillStyle = `rgba(${g + 8},${g + 2},${g - 4},0.5)`
       ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2)
     }
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-    tex.repeat.set(12, 12)
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(12, 12)
     return tex
   }
-  const groundTex = makeConcrete()
-  disposables.push(groundTex)
+  const groundTex = makeConcrete(); disposables.push(groundTex)
   const ground = new THREE.Mesh(
-    new THREE.CircleGeometry(120, 64),
-    new THREE.MeshStandardMaterial({ map: groundTex, color: 0x9298a0, roughness: 0.95, metalness: 0.0 })
+    new THREE.CircleGeometry(140, 64),
+    new THREE.MeshStandardMaterial({ map: groundTex, color: 0x8f867b, roughness: 0.96, metalness: 0.0 })
   )
   ground.rotation.x = -Math.PI / 2
   scene.add(ground)
   const pad = new THREE.Mesh(
     new THREE.CylinderGeometry(2.3, 2.8, 0.45, 40),
-    new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.7, metalness: 0.4, envMapIntensity: 1.0 })
+    new THREE.MeshStandardMaterial({ color: 0x33322f, roughness: 0.7, metalness: 0.4, envMapIntensity: 1.0 })
   )
-  pad.position.y = 0.22
-  scene.add(pad)
+  pad.position.y = 0.22; scene.add(pad)
 
-  // ---- 不锈钢星舰风火箭（拉丝 + 横向焊缝，明亮亮钢）----
+  // ---- 发射塔 + 筷子夹（Mechazilla 意象）----
+  const towerMat = new THREE.MeshStandardMaterial({ color: 0x35383f, metalness: 0.75, roughness: 0.5, envMapIntensity: 1.1 })
+  function makeTower() {
+    const t = new THREE.Group()
+    const bx = 0.85, tall = 11.5
+    const post = new THREE.BoxGeometry(0.18, tall, 0.18)
+    for (const [dx, dz] of [[-bx, -bx], [bx, -bx], [-bx, bx], [bx, bx]]) {
+      const p = new THREE.Mesh(post, towerMat); p.position.set(dx, tall / 2, dz); t.add(p)
+    }
+    const rx = new THREE.BoxGeometry(bx * 2, 0.09, 0.09)
+    const rz = new THREE.BoxGeometry(0.09, 0.09, bx * 2)
+    for (let y = 1; y <= tall - 0.5; y += 1.25) {
+      for (const z of [-bx, bx]) { const m = new THREE.Mesh(rx, towerMat); m.position.set(0, y, z); t.add(m) }
+      for (const x of [-bx, bx]) { const m = new THREE.Mesh(rz, towerMat); m.position.set(x, y, 0); t.add(m) }
+    }
+    // 筷子夹：两条伸向火箭的横臂
+    const arm = new THREE.BoxGeometry(3.4, 0.26, 0.4)
+    const a1 = new THREE.Mesh(arm, towerMat); a1.position.set(bx + 1.7, 5.4, 0.55); t.add(a1)
+    const a2 = new THREE.Mesh(arm, towerMat); a2.position.set(bx + 1.7, 5.4, -0.55); t.add(a2)
+    return t
+  }
+  const tower = makeTower(); tower.position.set(-3.7, 0, -0.2); scene.add(tower)
+
+  // ---- 不锈钢星舰（拉丝 + 横向焊缝 + 发动机群）----
   function makeSteelTexture() {
     const c = document.createElement('canvas'); c.width = 128; c.height = 512
     const ctx = c.getContext('2d')
-    ctx.fillStyle = '#d9dee5'; ctx.fillRect(0, 0, 128, 512)
-    for (let x = 0; x < 128; x++) { // 竖向拉丝
+    ctx.fillStyle = '#d7dce3'; ctx.fillRect(0, 0, 128, 512)
+    for (let x = 0; x < 128; x++) {
       const v = Math.floor(Math.random() * 16)
-      ctx.fillStyle = `rgba(${182 + v},${188 + v},${196 + v},0.22)`
+      ctx.fillStyle = `rgba(${180 + v},${186 + v},${194 + v},0.22)`
       ctx.fillRect(x, 0, 1, 512)
     }
-    ctx.strokeStyle = 'rgba(120,128,138,0.5)'; ctx.lineWidth = 1.4 // 横向焊缝环
-    for (let y = 26; y < 512; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(128, y); ctx.stroke() }
-    const tex = new THREE.CanvasTexture(c)
-    tex.colorSpace = THREE.SRGBColorSpace
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
-    tex.repeat.set(3, 1)
+    ctx.strokeStyle = 'rgba(112,120,132,0.55)'; ctx.lineWidth = 1.4
+    for (let y = 24; y < 512; y += 38) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(128, y); ctx.stroke() }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(3, 1)
     return tex
   }
-  const steelTex = makeSteelTexture()
-  disposables.push(steelTex)
+  const steelTex = makeSteelTexture(); disposables.push(steelTex)
   const rocket = new THREE.Group()
-  const steel = new THREE.MeshStandardMaterial({ map: steelTex, color: 0xeef2f6, metalness: 0.9, roughness: 0.26, envMapIntensity: 1.55 })
-  const steelPlain = new THREE.MeshStandardMaterial({ color: 0xdbe1e8, metalness: 0.9, roughness: 0.24, envMapIntensity: 1.55 })
-  const darkSteel = new THREE.MeshStandardMaterial({ color: 0x2f333a, metalness: 0.85, roughness: 0.4, envMapIntensity: 1.3 })
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 5, 64), steel); body.position.y = 3
-  const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.6, 1.7, 64), steel); nose.position.y = 6.35
-  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.74, 0.7, 64), darkSteel); skirt.position.y = 0.85
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.606, 0.606, 0.16, 64), darkSteel); band.position.y = 4.7
+  const steel = new THREE.MeshStandardMaterial({ map: steelTex, color: 0xf0f3f7, metalness: 0.92, roughness: 0.2, envMapIntensity: 1.5 })
+  const steelPlain = new THREE.MeshStandardMaterial({ color: 0xdde2e8, metalness: 0.92, roughness: 0.2, envMapIntensity: 1.5 })
+  const darkSteel = new THREE.MeshStandardMaterial({ color: 0x2c2f35, metalness: 0.8, roughness: 0.45, envMapIntensity: 1.2 })
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 5, 72), steel); body.position.y = 3
+  const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.6, 1.7, 72), steel); nose.position.y = 6.35
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, 0.7, 72), darkSteel); skirt.position.y = 0.82
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(0.606, 0.606, 0.16, 72), darkSteel); band.position.y = 4.7
   const flapGeo = new THREE.BoxGeometry(0.1, 1.1, 0.72)
   const flapTop = new THREE.Mesh(flapGeo, steelPlain); flapTop.position.set(0.66, 5.5, 0)
   const flapBot = new THREE.Mesh(flapGeo, steelPlain); flapBot.position.set(-0.66, 1.55, 0)
   rocket.add(body, nose, skirt, band, flapTop, flapBot)
+  // 发动机群（裙底的一圈喷管）
+  const nozGeo = new THREE.CylinderGeometry(0.1, 0.17, 0.4, 20)
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2
+    const n = new THREE.Mesh(nozGeo, darkSteel)
+    n.position.set(Math.cos(a) * 0.32, 0.32, Math.sin(a) * 0.32); rocket.add(n)
+  }
+  const nozC = new THREE.Mesh(nozGeo, darkSteel); nozC.position.set(0, 0.32, 0); rocket.add(nozC)
   scene.add(rocket)
 
-  // ---- 尾焰：明亮内芯 + 柔和外辉 ----
+  // ---- 尾焰 ----
   const flameMat = new THREE.MeshBasicMaterial({ color: 0xffb25a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1, 28), flameMat)
-  flame.rotation.x = Math.PI
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.34, 1, 28), flameMat); flame.rotation.x = Math.PI
   const glowMat = new THREE.MeshBasicMaterial({ color: 0xff7a1a, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
-  const glow = new THREE.Mesh(new THREE.ConeGeometry(0.62, 1, 24), glowMat)
-  glow.rotation.x = Math.PI
-  const engineY = 0.5
+  const glow = new THREE.Mesh(new THREE.ConeGeometry(0.62, 1, 24), glowMat); glow.rotation.x = Math.PI
+  const engineY = 0.2
   flame.position.y = engineY; glow.position.y = engineY
   rocket.add(flame, glow)
 
@@ -171,7 +189,7 @@ export function createRocketScene(mount) {
     } else if (state.twr != null) {
       rocket.position.y = 0
     }
-    rocket.rotation.y += 0.0015
+    rocket.rotation.y += 0.0014
     renderer.render(scene, camera)
   }
   tick()
