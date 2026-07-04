@@ -144,11 +144,11 @@ export function createRocketScene(mount) {
   const nose = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.6, 1.7, 72), steel); nose.position.y = 6.35
   const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.7, 0.7, 72), darkSteel); skirt.position.y = 0.82
   const band = new THREE.Mesh(new THREE.CylinderGeometry(0.606, 0.606, 0.16, 72), darkSteel); band.position.y = 4.7
-  // 星舰襟翼（前襟靠上、后襟靠下，同侧，做成贴合船身的鳍状）
-  const flapGeo = new THREE.BoxGeometry(0.14, 1.35, 0.5)
-  const flapTop = new THREE.Mesh(flapGeo, steel); flapTop.position.set(0.6, 5.4, 0.28); flapTop.rotation.z = -0.12
-  const flapBot = new THREE.Mesh(flapGeo, steel); flapBot.position.set(0.6, 1.5, 0.28); flapBot.rotation.z = 0.12
-  rocket.add(body, nose, skirt, band, flapTop, flapBot)
+  // 星舰后襟翼：船尾两片扁平后掠的大襟翼，贴合下部船身
+  const flapGeo = new THREE.BoxGeometry(0.09, 1.6, 1.0)
+  const flapL = new THREE.Mesh(flapGeo, steel); flapL.position.set(-0.56, 1.6, 0.05); flapL.rotation.z = 0.16
+  const flapR = new THREE.Mesh(flapGeo, steel); flapR.position.set(0.56, 1.6, 0.05); flapR.rotation.z = -0.16
+  rocket.add(body, nose, skirt, band, flapL, flapR)
   // 发动机群（裙底的一圈喷管）
   const nozGeo = new THREE.CylinderGeometry(0.1, 0.17, 0.4, 20)
   for (let i = 0; i < 8; i++) {
