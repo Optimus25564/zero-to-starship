@@ -1,17 +1,8 @@
-import * as THREE from 'three'
+import { createRocketScene } from './scene/rocketScene.js'
 
 const app = document.getElementById('app')
-const renderer = new THREE.WebGLRenderer({ antialias: true })
-renderer.setSize(window.innerWidth, window.innerHeight)
-app.appendChild(renderer.domElement)
+app.style.cssText = 'position:fixed;inset:0;'
+const scene = createRocketScene(app)
 
-const scene = new THREE.Scene()
-scene.background = new THREE.Color(0x0b1020)
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000)
-camera.position.set(0, 2, 8)
-
-function animate() {
-  requestAnimationFrame(animate)
-  renderer.render(scene, camera)
-}
-animate()
+// 手动验证用：3 秒后模拟一次"达标发射"
+setTimeout(() => scene.update({ thrust: 800000, twr: 1.6, goalMet: true }), 3000)
