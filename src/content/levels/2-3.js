@@ -6,6 +6,7 @@ const CYCLES = [
 
 export const level = {
   id: '2.3',
+  stage: 'ascent',
   title: '发动机循环',
   interaction: 'choice',
   hook: '发动机的"心脏"是涡轮泵，怎么驱动涡轮泵、怎么处理驱动完的废气，决定了发动机能不能被高效点火、反复使用几十次而不用大修。',

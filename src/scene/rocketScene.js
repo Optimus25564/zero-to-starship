@@ -188,10 +188,10 @@ export function createRocketScene(mount) {
     rocket.position.y = rocketY
   }
 
-  // 点"发射/继续"时触发：起飞→升空；飞行→加推力（不飞走）；下降→软着陆或硬摔
+  // 点"发射/继续"时触发：起飞→达标才升空（不够只喷火）；飞行→加推力；下降→软着陆或硬摔
   function play(success) {
     rocket.rotation.z = 0
-    if (stage === 'liftoff') { rocketY = 0; anim = { type: 'launch', t: 0, vy: 0 } }
+    if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
     else if (stage === 'descent') { rocketY = 8; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 } }
     else if (stage === 'ascent') { anim = { type: 'boost', t: 0 } }
     else { rocketY = 0; anim = { type: 'pad-fire', t: 0 } }
@@ -231,10 +231,8 @@ export function createRocketScene(mount) {
       flameThrust = Math.max(flameThrust, 520000)
     } else if (stage === 'descent') {
       rocketY = 8; flameThrust = 300000            // 下降关预览：高空 + 反推焰
-    } else if (state.twr != null && state.twr >= 1) {
-      rocketY = Math.min(rocketY + 0.02 * (state.twr - 1 + 0.1), 1.6)  // 起飞关预览：小幅抬升
-    } else if (state.twr != null) {
-      rocketY = 0
+    } else {
+      rocketY = 0                                  // 台上/起飞：调参时火箭不动，点发射才起飞
     }
 
     rocket.position.y = rocketY
