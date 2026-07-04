@@ -53,4 +53,10 @@ describe('evaluateLevel', () => {
     expect(low.goalMet).toBe(false)
     expect(high.goalMet).toBe(true)
   })
+  it('2.1 选甲烷 goalMet 为 true，选 RP-1 或液氢 goalMet 为 false', () => {
+    const l = LEVELS.find((x) => x.id === '2.1')
+    expect(evaluateLevel(l, { choice: 'methane' }).goalMet).toBe(true)
+    expect(evaluateLevel(l, { choice: 'rp1' }).goalMet).toBe(false)
+    expect(evaluateLevel(l, { choice: 'hydrogen' }).goalMet).toBe(false)
+  })
 })
