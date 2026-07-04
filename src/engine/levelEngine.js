@@ -8,11 +8,13 @@ import { createSequenceModule } from '../interaction/sequenceModule.js'
 import { createRocketScene } from '../scene/rocketScene.js'
 import { createBlueprintOverlay } from '../overlay/blueprintOverlay.js'
 import { createHud } from '../ui/hud.js'
+import { createDiagramPanel } from '../ui/diagramPanel.js'
 
 export function startGame(mount) {
   const progression = createProgression(LEVELS.map((l) => l.id))
   const scene = createRocketScene(mount)
   const overlay = createBlueprintOverlay(mount)
+  const diagram = createDiagramPanel(mount)
 
   let current, params, interactionMod, hud
 
@@ -76,6 +78,7 @@ export function startGame(mount) {
     }
     hud.setHook(level.hook)
     hud.setGoal(level.goal.text)
+    diagram.setDiagram(level.diagram || null)
 
     if (interactionMod) interactionMod.destroy()
     if (level.interaction === 'choice') {
@@ -105,6 +108,6 @@ export function startGame(mount) {
   loadLevel(progression.nextLockedUnlockedId())
 
   return {
-    dispose: () => { scene.dispose(); overlay.dispose() },
+    dispose: () => { scene.dispose(); overlay.dispose(); diagram.destroy() },
   }
 }
