@@ -17,7 +17,7 @@ describe('LEVELS 配置', () => {
     const ids = LEVELS.map((l) => l.id)
     for (const core of ['1.1', '1.2', '1.3', '2.1']) expect(ids).toContain(core)
     expect(ids).toEqual(ORDER)                          // 顺序由 ORDER 决定
-    expect(ORDER.indexOf('3.2')).toBeLessThan(ORDER.indexOf('2.1'))  // 分离在"仅二级"关卡之前
+    expect(ORDER.indexOf('3.2')).toBeLessThan(ORDER.indexOf('3.3'))  // 分离在"仅二级/入轨"关卡之前
   })
   it('每关都有目标文案，且按交互类型具备对应字段', () => {
     for (const l of LEVELS) {

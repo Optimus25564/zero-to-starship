@@ -9,6 +9,7 @@ const PROPELLANTS = [
 export const level = {
   id: '2.1',
   stage: 'ascent',
+  vehicle: 'stack',  // 分离前：全箭上升
   title: { zh: '推进剂之选：液体燃料', en: 'Choosing a Propellant: Liquid Fuel' },
   interaction: 'choice',
   hook: { zh: '火箭在真空里没有空气可烧，所以必须自带"氧化剂"——液体燃料火箭把燃料和氧化剂分成两个大罐、用泵抽进燃烧室。选哪种组合，决定了它能飞多远、好不好回收。', en: 'In a vacuum a rocket has no air to burn, so it must carry its own "oxidizer"—a liquid-fuel rocket keeps fuel and oxidizer in two large tanks and pumps them into the combustion chamber. Which combination you pick decides how far it can fly and how easily it can be recovered.' },

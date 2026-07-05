@@ -9,6 +9,7 @@ const CYCLES = [
 export const level = {
   id: '2.3',
   stage: 'ascent',
+  vehicle: 'stack',  // 分离前：全箭上升
   title: { zh: '发动机循环', en: 'Engine Cycles' },
   interaction: 'choice',
   hook: { zh: '发动机的"心脏"是涡轮泵，怎么驱动涡轮泵、怎么处理驱动完的废气，决定了发动机能不能被高效点火、反复使用几十次而不用大修。', en: 'The "heart" of an engine is its turbopump. How you drive that turbopump—and what you do with the exhaust once it has done its job—decides whether the engine can be fired efficiently and reused dozens of times without an overhaul.' },

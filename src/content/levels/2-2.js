@@ -6,6 +6,7 @@ const P = {
 export const level = {
   id: '2.2',
   stage: 'ascent',
+  vehicle: 'stack',  // 分离前：全箭上升
   highlight: 'engine',
   title: { zh: '燃烧室与喷管', en: 'Combustion Chamber & Nozzle' },
   hook: { zh: '燃烧室里的燃气又热又高压，但真正决定火箭飞多快的，是喷管怎么把这团混乱的气体，捏成一股笔直高速的气流喷出去。', en: 'The gas in the combustion chamber is scorching hot and highly pressurized, but what really determines how fast the rocket flies is how the nozzle squeezes that chaotic gas into a single straight, high-speed jet.' },

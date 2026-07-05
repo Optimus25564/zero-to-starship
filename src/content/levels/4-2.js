@@ -7,6 +7,7 @@ const Q_MAX = 600
 export const level = {
   id: '4.2',
   stage: 'ascent',
+  vehicle: 'stack',  // 分离前：全箭上升
   title: { zh: '最大动压 Max-Q', en: 'Maximum Dynamic Pressure (Max-Q)' },
   hook: { zh: '火箭穿过稠密大气层时，速度和空气密度的乘积会先冲高再回落——那个峰值叫"最大动压"，简称 Max-Q。发射直播里那句"Max-Q，主机节流"，就是主控在这一刻把发动机拉低推力，怕结构被吹散。', en: 'As a rocket climbs through the dense lower atmosphere, the product of its speed and the air density rises then falls back — that peak is called "maximum dynamic pressure," or Max-Q for short. That line in launch broadcasts, "Max-Q, throttling down," is mission control cutting engine thrust at this moment, for fear the structure could be torn apart.' },
   params: [P.throttle],
