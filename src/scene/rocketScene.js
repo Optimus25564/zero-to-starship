@@ -69,28 +69,40 @@ export function createRocketScene(mount) {
     const cw = 1024, ch = 512
     const c = document.createElement('canvas'); c.width = cw; c.height = ch
     const ctx = c.getContext('2d')
+    const LIMB = 0.5   // 地球边缘（大气弧）所在的 v，约对应英雄机位画面下沿
     const g = ctx.createLinearGradient(0, 0, 0, ch)
-    g.addColorStop(0.00, '#04060e') // 天顶深空
-    g.addColorStop(0.40, '#070b18')
-    g.addColorStop(0.47, '#0a1a3a') // 接近地球（英雄机位下沿约在此）
-    g.addColorStop(0.51, '#3f86e0') // 大气辉光带
-    g.addColorStop(0.545, '#a6cbf4')
-    g.addColorStop(0.60, '#3d78c4')
-    g.addColorStop(0.80, '#1d4d8c') // 地球海洋
-    g.addColorStop(1.00, '#0f3568')
+    g.addColorStop(0.00, '#01020a')            // 天顶：近黑深空
+    g.addColorStop(LIMB - 0.06, '#03060f')
+    g.addColorStop(LIMB - 0.015, '#0a1e46')    // 逼近地球边缘的暗蓝
+    g.addColorStop(LIMB, '#7fc6ff')            // ★ 明亮大气弧（地球 limb）
+    g.addColorStop(LIMB + 0.02, '#1f6fd0')     // 大气外沿
+    g.addColorStop(LIMB + 0.10, '#1856a8')     // 地球海洋（饱和蓝）
+    g.addColorStop(0.78, '#134a94')
+    g.addColorStop(1.00, '#0e3f84')
     ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch)
-    for (let i = 0; i < 620; i++) {   // 星星（只在上部深空）
-      const y = Math.random() * ch * 0.42, x = Math.random() * cw, r = Math.random() * 1.3
-      ctx.fillStyle = `rgba(255,255,255,${0.35 + Math.random() * 0.6})`
+    // 深空繁星（只在地球以上，越靠天顶越密）
+    for (let i = 0; i < 900; i++) {
+      const y = Math.random() * ch * (LIMB - 0.04), x = Math.random() * cw
+      const r = Math.random() < 0.12 ? 1.4 + Math.random() * 0.8 : Math.random() * 1.1
+      ctx.fillStyle = `rgba(255,255,255,${0.4 + Math.random() * 0.6})`
       ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill()
     }
-    const atmo = ctx.createLinearGradient(0, ch * 0.48, 0, ch * 0.57)  // 横向大气亮带增强地球 limb
-    atmo.addColorStop(0, 'rgba(160,205,255,0)'); atmo.addColorStop(0.5, 'rgba(185,220,255,0.6)'); atmo.addColorStop(1, 'rgba(160,205,255,0)')
-    ctx.fillStyle = atmo; ctx.fillRect(0, ch * 0.48, cw, ch * 0.09)
-    for (let i = 0; i < 46; i++) {    // 云带 / 陆地斑
-      const y = ch * 0.6 + Math.random() * ch * 0.38, x = Math.random() * cw
-      ctx.fillStyle = `rgba(${205 + Math.random() * 40},${215 + Math.random() * 35},${225 + Math.random() * 25},${0.12 + Math.random() * 0.22})`
-      ctx.beginPath(); ctx.ellipse(x, y, 14 + Math.random() * 32, 5 + Math.random() * 10, 0, 0, 7); ctx.fill()
+    // 大气辉光亮带（在 limb 上叠一条更亮的弧）
+    const atmo = ctx.createLinearGradient(0, ch * (LIMB - 0.02), 0, ch * (LIMB + 0.03))
+    atmo.addColorStop(0, 'rgba(150,210,255,0)'); atmo.addColorStop(0.45, 'rgba(200,235,255,0.85)'); atmo.addColorStop(1, 'rgba(150,210,255,0)')
+    ctx.fillStyle = atmo; ctx.fillRect(0, ch * (LIMB - 0.02), cw, ch * 0.05)
+    // 地球上的云带
+    for (let i = 0; i < 40; i++) {
+      const y = ch * (LIMB + 0.08) + Math.random() * ch * 0.4, x = Math.random() * cw
+      ctx.fillStyle = `rgba(235,242,250,${0.14 + Math.random() * 0.26})`
+      ctx.beginPath(); ctx.ellipse(x, y, 16 + Math.random() * 36, 5 + Math.random() * 9, 0, 0, 7); ctx.fill()
+    }
+    // 地球上的陆块（绿褐）
+    for (let i = 0; i < 14; i++) {
+      const y = ch * (LIMB + 0.14) + Math.random() * ch * 0.34, x = Math.random() * cw
+      const gr = Math.random() < 0.5
+      ctx.fillStyle = gr ? `rgba(90,140,80,${0.3 + Math.random() * 0.25})` : `rgba(150,125,85,${0.28 + Math.random() * 0.22})`
+      ctx.beginPath(); ctx.ellipse(x, y, 22 + Math.random() * 40, 9 + Math.random() * 14, 0, 0, 7); ctx.fill()
     }
     const tex = new THREE.CanvasTexture(c)
     tex.colorSpace = THREE.SRGBColorSpace
@@ -547,9 +559,8 @@ export function createRocketScene(mount) {
     resetRecoveryFx()                              // 复位一级回收动画状态
     armOpen = stage === 'descent' ? 1 : 0; applyArms(armOpen)  // 回收关臂张开候着；其余合拢
     const airborne = stage === 'ascent' || stage === 'separate'
-    const landing = stage === 'descent'                        // 回收关：一级在空中朝塔架降落
-    ground.visible = pad.visible = !airborne && !landing       // 起飞才有地面/发射台座；上升/回收都收起
-    tower.visible = !airborne                                  // 塔架保留（回收要用筷子夹）
+    const landing = stage === 'descent'                        // 回收关：预览时纯一级在空中
+    ground.visible = pad.visible = tower.visible = !airborne && !landing  // 回收预览连塔架也不显示；点发射(回收)时塔架才出现
     rocketY = landing ? 12 : airborne ? 2.4 : 0                // 下降关：从高空回来
     rocket.position.y = rocketY
   }
@@ -559,6 +570,7 @@ export function createRocketScene(mount) {
     rocket.rotation.z = 0
     if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
     else if (stage === 'descent') {
+      tower.visible = true   // 点发射(回收)：塔架出现，演筷子夹取
       if (success && vehicle === 'booster' && recoveryStyle === 'full') {
         // 一级回收全流程：从高空掉头开始
         rocketY = 8.5; rocket.position.x = 2.8; rocket.rotation.z = 1.9
