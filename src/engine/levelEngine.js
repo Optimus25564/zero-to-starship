@@ -48,8 +48,9 @@ export function startGame(mount) {
       deltaV: derived.deltaV ?? null,
       goalMet: false,
     })
+    const noPick = current.interaction === 'choice' && !params.choice
     overlay.update({
-      formulaText: current.formulaHUD(params, derived, getLang()),
+      formulaText: noPick ? t({ zh: '⬆ 先选一个方案', en: '⬆ Pick an option first' }) : current.formulaHUD(params, derived, getLang()),
       thrust: derived.thrust ?? 0,
       weight: derived.weight ?? 0,
     })
@@ -61,6 +62,10 @@ export function startGame(mount) {
   }
 
   function launch() {
+    if (current.interaction === 'choice' && !params.choice) {   // 未选择时先提醒
+      hud.setFeedback({ goalMet: false, message: t({ zh: '先选一个方案再发射', en: 'Pick an option before launching' }) })
+      return
+    }
     const { derived, goalMet } = evaluateLevel(current, params)
     scene.update({
       thrust: derived.thrust ?? 0,
@@ -125,7 +130,7 @@ export function startGame(mount) {
 
     if (interactionMod) interactionMod.destroy()
     if (level.interaction === 'choice') {
-      params = { choice: level.options.find((o) => o.default)?.key ?? level.options[0].key }
+      params = { choice: null }   // 不默认选中，玩家自己选
       interactionMod = createChoiceModule(
         hud.slot,
         level.options.map((o) => ({ key: o.key, label: o.label })),
