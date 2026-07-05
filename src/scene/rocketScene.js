@@ -210,6 +210,7 @@ export function createRocketScene(mount) {
     scene.fog = (space || sea) ? null : skyFog
     for (const m of earthMeshes) m.visible = space
     ocean.visible = droneship.visible = sea
+    setLegsVisible(sea); if (sea) setLegsDeploy(0)   // 海上回收：一级带着陆腿（收拢）；其余场景无腿
     if (sea) { camera.position.set(10, 4.2, 26); camera.lookAt(0, 3.2, 0) }   // 海上回收机位：容得下海面+无人船+下降的一级
   }
 
@@ -405,8 +406,8 @@ export function createRocketScene(mount) {
     hinge.visible = false   // 仅海上无人船回收时显示（超重助推器平时无腿）
     legs.push(hinge)
   }
-  function setLegsDeploy(f) {   // f: 0 收拢(贴着箭体朝上) → 1 完全展开(向外下方撑开)
-    for (const h of legs) h.rotation.z = 1.75 - f * 2.35   // 收拢≈+100° → 展开≈-35°
+  function setLegsDeploy(f) {   // f: 0 收拢(贴着箭体竖起) → 1 完全展开(向外下方撑开成着陆架)
+    for (const h of legs) h.rotation.z = 3.0 - f * 3.5   // 收拢≈172°(贴壁) → 展开≈-29°(下外撑)
   }
   function setLegsVisible(b) { for (const h of legs) h.visible = b }
   setLegsDeploy(0)
@@ -698,7 +699,13 @@ export function createRocketScene(mount) {
     rocket.rotation.z = 0
     if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
     else if (stage === 'descent') {
-      if (recoveryStyle === 'reentry') {
+      if (recoveryStyle === 'sea') {
+        // 海上无人船回收：一级下降落到下游洋面的无人船甲板（用着陆腿，不夹筷子）
+        ground.visible = pad.visible = tower.visible = false
+        setLegsVisible(true); setLegsDeploy(0)
+        if (success) { rocketY = 11; rocket.position.x = 0; rocket.rotation.z = 0; anim = { type: 'sealand', t: 0 } }
+        else { anim = null }   // 选错回收方式：不着陆，停在空中
+      } else if (recoveryStyle === 'reentry') {
         // 二级星舰再入：在轨、深空+地球，腹部朝下按再入角斜切进入（不显示发射场）
         ground.visible = pad.visible = tower.visible = false
         camera.position.set(0, 6, 21); camera.lookAt(0, 5, 0)   // 正对居中：星舰斜切划过画面中央
@@ -803,6 +810,18 @@ export function createRocketScene(mount) {
         rocket.rotation.z += (tgtRot - rocket.rotation.z) * 0.03
         setFinsDeploy(fins); reentryMat.opacity = glow
         flameThrust = burn; bright = true
+      } else if (anim.type === 'sealand') {
+        // 海上无人船回收：一级反推下降，接近甲板时展开着陆腿，稳稳落在无人船上
+        const tgtY = 1.7
+        rocketY += (tgtY - rocketY) * 0.02
+        const legF = rocketY < 5 ? Math.min(1, (5 - rocketY) / 2.4) : 0   // 临近甲板才展开着陆腿
+        setLegsDeploy(legF)
+        const landed = rocketY < 2.1
+        flameThrust = landed ? 0 : 340000                                 // 触船前反推，落稳即关机
+        sepStep = landed
+          ? t({ zh: '稳稳落在无人船甲板 ✅', en: 'Touchdown on the droneship ✅' })
+          : t({ zh: '海上无人船回收 · 反推下降', en: 'Droneship recovery · retropropulsion' })
+        bright = true
       } else if (anim.type === 'reenter') {
         // 二级星舰再入：腹部朝下，按【再入角】从左上方切入。角度决定坡度与结局：
         //   安全走廊(4~7°)：稳稳穿过，橙红等离子；太浅(<4°)：打水漂被弹回；太陡(>7°)：白热过热烧毁

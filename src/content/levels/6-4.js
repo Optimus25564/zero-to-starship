@@ -9,6 +9,9 @@ const OPTIONS = [
 export const level = {
   id: '6.4',
   vehicle: 'booster',   // 海上/陆地回收讨论的是一级
+  stage: 'descent',     // 一级在空中下降，选对(海上无人船)就落到甲板上
+  env: 'sea',           // 海面 + 自动驾驶无人船
+  recovery: 'sea',      // 选 ASDS 成功 → 播放海上无人船着陆动画（着陆腿）
   title: { zh: '海上还是陆地回收', en: 'Recover at Sea or on Land?' },
   interaction: 'choice',
   hook: { zh: '这次任务又重又远：卫星很沉，还要送到一条高能量转移轨道。一级用光了大部分燃料才把它推上去，选错回收方式，一级可能连回家的油都不够。', en: 'This mission is both heavy and far: the satellite is massive and has to go to a high-energy transfer orbit. The booster burns most of its fuel just to push it up there, so pick the wrong recovery mode and the booster may not even have enough fuel to get home.' },
