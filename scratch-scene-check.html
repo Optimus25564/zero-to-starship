@@ -1,0 +1,12 @@
+<!doctype html><html><body><div id="m" style="width:900px;height:600px"></div>
+<script type="module">
+import { createRocketScene } from '/src/scene/rocketScene.js'
+window.__err=[]; window.onerror=(m)=>window.__err.push(String(m))
+try {
+  const s = createRocketScene(document.getElementById('m'))
+  s.setVehicle('booster'); s.setStage('descent'); s.setRecovery('full')
+  s.update({ thrust: 800000, goalMet: true }); s.play(true)
+  await new Promise(r=>setTimeout(r,600))
+  document.title = 'OK errors=' + window.__err.length + ' ' + window.__err.slice(0,2).join('|')
+} catch(e){ document.title='THREW '+e.message }
+</script></body></html>

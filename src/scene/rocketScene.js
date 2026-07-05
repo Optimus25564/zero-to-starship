@@ -577,7 +577,7 @@ export function createRocketScene(mount) {
         // 一级回收全流程：刚分离，在远离发射场的【高空】——掉头/展舵/再入都看不到塔架，
         // 先把整个发射场藏起来，等最后一步"着陆点火"再露出塔架、被筷子夹住。
         ground.visible = pad.visible = tower.visible = false
-        rocketY = 15; rocket.position.x = 3.6; rocket.rotation.z = 0
+        rocketY = 8; rocket.position.x = 3.6; rocket.rotation.z = 0   // 高空但取景框内（无地面参照，绝对高度看不出来）
         setFinsDeploy(0); reentryMat.opacity = 0
         anim = { type: 'recover', t: 0 }
       } else {
@@ -646,22 +646,22 @@ export function createRocketScene(mount) {
         let tgtY, tgtX, tgtRot, burn = 0, glow = 0, fins, showSite = false
         if (rt < 5.0) {                   // ① 掉头 · 回推点火（高空，无塔架）
           sepStep = t({ zh: '① 掉头 · 回推点火（高空）', en: '① Flip around · boostback burn (high up)' })
-          tgtY = 15; tgtX = 2.6; tgtRot = 1.55            // 翻成横向：发动机指向弹道前方
+          tgtY = 7; tgtX = 2.6; tgtRot = 1.55             // 翻成横向：发动机指向弹道前方
           burn = (rt > 1.8 && rt < 4.4) ? 900000 : 0      // 先慢慢转头，再点火把弹道推回发射场
           fins = 0                                        // 栅格舵仍收着
-        } else if (rt < 10.0) {           // ② 展开栅格舵 · 立直（高空，无塔架）
+        } else if (rt < 10.0) {           // ② 展开栅格舵 · 立直（高空，无塔架）—— 栅格舵在取景框内翻出
           sepStep = t({ zh: '② 展开栅格舵 · 立直（高空）', en: '② Deploy grid fins · upright (high up)' })
-          tgtY = 14; tgtX = 1.0; tgtRot = 0               // 转回竖直、发动机朝下
+          tgtY = 6; tgtX = 1.0; tgtRot = 0                // 转回竖直、发动机朝下（停在框内，看清栅格舵翻出）
           fins = Math.min(1, (rt - 5.2) / 4.2)            // 栅格舵在再入前【慢慢翻出来】
-        } else if (rt < 15.0) {           // ③ 再入点火 · 减速（高空下坠，无塔架）
+        } else if (rt < 15.0) {           // ③ 再入点火 · 减速（高空，无塔架）
           sepStep = t({ zh: '③ 再入点火 · 减速', en: '③ Reentry burn · slow down' })
-          tgtY = 7; tgtX = 0.2; tgtRot = 0                // 笔直下坠
+          tgtY = 6; tgtX = 0.2; tgtRot = 0
           burn = (rt > 10.6 && rt < 14.2) ? 560000 : 0
           glow = rt < 13.6 ? Math.min(0.6, (rt - 10.0) / 1.6) : Math.max(0, 0.6 - (rt - 13.6) * 1.1)
           fins = 1
-        } else {                          // ④ 着陆点火 · 被筷子夹住（露出发射场）
-          sepStep = t({ zh: '④ 着陆点火 · 筷子夹住', en: '④ Landing burn · caught by the arms' })
-          tgtY = 3; tgtX = 0; tgtRot = 0
+        } else {                          // ④ 着陆点火 · 深度节流悬停 · 被筷子夹住（露出发射场）
+          sepStep = t({ zh: '④ 着陆点火 · 悬停 · 被筷子夹住', en: '④ Landing burn · hover · caught by the arms' })
+          tgtY = 3; tgtX = 0; tgtRot = 0                  // 冲着塔架笔直落下，深度节流悬停被夹
           burn = rocketY > 3.15 ? 500000 : 0
           fins = 1; showSite = true                       // 这一步才把发射场（地面+塔架+筷子）显示出来
         }

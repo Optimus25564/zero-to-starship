@@ -37,6 +37,6 @@ export const level = {
 
 export const milestone = {
   id: 'triple-burn-landing',
-  title: { zh: '三次点火法：回推、再入、着陆', en: 'The three-burn method: boostback, reentry, landing' },
-  fact: { zh: '一级分离后先做"回推点火"把弹道调头飞回发射场附近；再入大气前展开栅格舵稳定姿态、并用"再入点火"顶住高速气流减速防烧毁；最后接近地面时用"着陆点火"精确刹车，实现软着陆。三段点火环环相扣，缺一步都会摔。', en: 'After separation, the first stage first performs a "boostback burn" to reverse its trajectory and fly back toward the launch site; before reentering the atmosphere it deploys grid fins to stabilize its attitude and uses a "reentry burn" to push against the high-speed airflow, slowing down to avoid burning up; finally, as it nears the ground, a "landing burn" brakes precisely for a soft touchdown. The three burns are tightly interlinked — miss one step and it crashes.' },
+  title: { zh: '三次点火法：回推、再入、着陆悬停被夹', en: 'The three-burn method: boostback, reentry, hover-and-catch' },
+  fact: { zh: '一级分离后先做"回推点火"把弹道调头飞回发射场附近；再入大气前展开栅格舵稳定姿态、并用"再入点火"顶住高速气流减速防烧毁；最后用"着陆点火"精确刹车——这一下发动机被深度节流到只剩约三成推力，把推重比压到刚好 1 附近悬停，稳稳送进机械臂（筷子）夹住。固体火箭点了就关不掉、推力也调不了，永远做不到这种悬停软回收。三段点火环环相扣，缺一步都会摔。', en: 'After separation the first stage does a "boostback burn" to reverse its trajectory back toward the launch site; before reentry it deploys grid fins to steady its attitude and fires a "reentry burn" to push against the high-speed airflow and avoid burning up; finally a "landing burn" brakes precisely — here the engine is throttled deep, down to about a third of thrust, holding the thrust-to-weight ratio right around 1 to hover and settle gently into the mechanical arms (the "chopsticks"). A solid rocket can\'t be shut off or throttled once lit, so it could never do this hovering soft catch. The three burns are tightly interlinked — miss one and it crashes.' },
 }
