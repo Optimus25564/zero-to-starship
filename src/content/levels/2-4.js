@@ -10,6 +10,7 @@ export const level = {
   id: '2.4',
   stage: 'descent',
   vehicle: 'booster',   // 深度节流着陆：回收的是一级助推器（筷子夹）
+  recovery: 'full',     // 完整回收：掉头 → 再入点火 → 着陆(深度节流) → 筷子夹住
   title: { zh: '深度节流：为着陆而生', en: 'Deep Throttling: Built for Landing' },
   hook: { zh: '猎鹰9号着陆时，发动机不是全力以赴，而是被"捏"到只剩三成推力——马斯克管这叫深度节流（deep throttling），固体火箭做不到，这也是液体发动机能垂直软着陆的关键。', en: 'When Falcon 9 lands, its engine is not firing flat out—it is throttled down to just about a third of its thrust. Musk calls this deep throttling. Solid rockets cannot do it, and it is exactly what lets liquid engines make a vertical soft landing.' },
   params: [P.throttle],

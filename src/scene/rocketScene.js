@@ -500,6 +500,7 @@ export function createRocketScene(mount) {
   function applyVehicle() {
     booster.visible = vehicle === 'stack' || vehicle === 'booster'
     ship.visible = vehicle !== 'booster'
+    bInter.visible = vehicle !== 'booster'   // 仅一级(回收)：级间环已在热分离时抛掉，不再显示
     booster.position.y = 0; booster.rotation.z = 0
     shipFlame.visible = shipGlow.visible = false
     positionShip()
@@ -570,7 +571,7 @@ export function createRocketScene(mount) {
     rocket.rotation.z = 0
     if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
     else if (stage === 'descent') {
-      tower.visible = true   // 点发射(回收)：塔架出现，演筷子夹取
+      ground.visible = pad.visible = tower.visible = true   // 回收：完整发射场(地面+台座+塔+筷子)出现，和起飞时一样
       if (success && vehicle === 'booster' && recoveryStyle === 'full') {
         // 一级回收全流程：从高空掉头开始
         rocketY = 8.5; rocket.position.x = 2.8; rocket.rotation.z = 1.9
