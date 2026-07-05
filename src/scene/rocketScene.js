@@ -402,11 +402,13 @@ export function createRocketScene(mount) {
     strut.position.set(0, -0.95, 0); strut.userData.part = 'booster'; hinge.add(strut)
     const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.07, 12), darkSteel)
     foot.position.set(0, -1.9, 0); hinge.add(foot)
+    hinge.visible = false   // 仅海上无人船回收时显示（超重助推器平时无腿）
     legs.push(hinge)
   }
   function setLegsDeploy(f) {   // f: 0 收拢(贴着箭体朝上) → 1 完全展开(向外下方撑开)
     for (const h of legs) h.rotation.z = 1.75 - f * 2.35   // 收拢≈+100° → 展开≈-35°
   }
+  function setLegsVisible(b) { for (const h of legs) h.visible = b }
   setLegsDeploy(0)
   // 再入高温红光：包在一级箭体外的一层可加色发光壳，再入段淡入
   const reentryMat = new THREE.MeshBasicMaterial({ color: 0xff5326, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
@@ -697,10 +699,10 @@ export function createRocketScene(mount) {
     if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
     else if (stage === 'descent') {
       if (recoveryStyle === 'reentry') {
-        // 二级星舰再入：在轨高空、深空+地球，腹部朝下按再入角切入（不显示发射场）
+        // 二级星舰再入：在轨、深空+地球，腹部朝下按再入角斜切进入（不显示发射场）
         ground.visible = pad.visible = tower.visible = false
-        camera.position.set(2, 6, 27); camera.lookAt(0, 4.5, 0)   // 拉远：容得下横躺的星舰 + 斜切轨迹
-        rocketY = 7; rocket.position.x = -3.5; rocket.rotation.z = 1.15   // 从左上方、腹部朝下切入
+        camera.position.set(0, 6, 21); camera.lookAt(0, 5, 0)   // 正对居中：星舰斜切划过画面中央
+        rocketY = 8; rocket.position.x = -4; rocket.rotation.z = 0.95   // 从左上方、腹部朝下进入
         shipReentryMat.opacity = 0
         anim = { type: 'reenter', t: 0 }
       } else if (success && vehicle === 'booster' && recoveryStyle === 'full') {
@@ -806,27 +808,29 @@ export function createRocketScene(mount) {
         //   安全走廊(4~7°)：稳稳穿过，橙红等离子；太浅(<4°)：打水漂被弹回；太陡(>7°)：白热过热烧毁
         const rt = anim.t
         const ang = state.reentryAngle || 5
-        const slope = Math.tan(ang * Math.PI / 180) * 3.2   // 放大坡度以看清"角度"
-        const vx = 0.85                                      // 水平匀速推进
-        rocket.rotation.z += (1.15 - rocket.rotation.z) * 0.05   // 腹部朝下的再入姿态
-        let px = -3.5 + rt * vx, py, gl, hex = 0xff5a2a
+        rocket.rotation.z += (0.95 - rocket.rotation.z) * 0.06   // 腹部朝下的再入姿态
+        // 飞行路径角（放大以看清），分解成水平/竖直速度：角度越大，掉得越陡
+        const pathAng = Math.min(1.15, ang * 4.5 * Math.PI / 180)
+        const spd = 1.3, hx = spd * Math.cos(pathAng)
+        let px = -4 + rt * hx, py, gl, hex = 0xff6a2a
         if (state.reentrySteep) {                            // 太陡：急坠 + 白热 + 抖动 → 烧毁
-          py = 7 - rt * vx * slope
-          gl = Math.min(1.0, rt / 1.4); hex = rt > 1.6 ? 0xffffff : 0xff5a2a
-          px += Math.sin(rt * 42) * 0.05 * Math.min(1, rt)
+          py = 8 - rt * spd * Math.sin(pathAng) * 1.4
+          gl = Math.min(1.0, rt / 1.2); hex = rt > 1.8 ? 0xffffff : 0xff6a2a
+          px += Math.sin(rt * 40) * 0.06 * Math.min(1, rt)
           sepStep = t({ zh: `再入角 ${ang}° · 太陡：过热烧毁 🔥`, en: `Reentry ${ang}° · too steep: burning up 🔥` })
         } else if (state.reentryShallow) {                   // 太浅：切入后被大气弹回（打水漂）
-          const dn = Math.min(rt, 3), up = Math.max(0, rt - 3)
-          py = 7 - dn * vx * slope + up * up * 0.35
-          gl = Math.max(0, 0.42 - Math.abs(rt - 2.2) * 0.16)
+          const dn = Math.min(rt, 3.5), up = Math.max(0, rt - 3.5)
+          py = 8 - dn * spd * Math.sin(pathAng) + up * up * 0.5
+          gl = Math.max(0, 0.5 - Math.abs(rt - 2.4) * 0.16)
           sepStep = t({ zh: `再入角 ${ang}° · 太浅：打水漂被弹回 🪨`, en: `Reentry ${ang}° · too shallow: skips off 🪨` })
-        } else {                                             // 安全走廊：稳稳下滑穿过
-          py = 7 - rt * vx * slope
-          gl = Math.min(0.62, rt / 1.5) * (rt > 6 ? Math.max(0, 1 - (rt - 6) / 2) : 1)
+        } else {                                             // 安全走廊：稳稳斜切穿过
+          py = 8 - rt * spd * Math.sin(pathAng)
+          gl = Math.min(0.85, rt / 1.3) * (rt > 7 ? Math.max(0, 1 - (rt - 7) / 2) : 1)
           sepStep = t({ zh: `再入角 ${ang}° · 安全走廊，稳稳穿过 ✅`, en: `Reentry ${ang}° · safe corridor ✅` })
         }
         rocket.position.x = px; rocketY = py
-        shipReentryMat.color.setHex(hex); shipReentryMat.opacity = gl
+        shipReentryMat.color.setHex(hex)
+        shipReentryMat.opacity = gl * (0.82 + 0.18 * Math.sin(time * 18))   // 等离子闪动
         flameThrust = 0; bright = true
       } else if (anim.type === 'launch') {
         anim.vy = Math.min(anim.vy + 0.00035, 0.036) // 缓缓离地、越升越快，约 6 秒爬出画面
