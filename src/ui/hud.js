@@ -1,11 +1,12 @@
 import { t } from '../i18n.js'
 
-export function createHud(mount, { onLaunch, onNext }) {
+export function createHud(mount, { onLaunch, onNext, onPrev }) {
   const root = document.createElement('div')
   root.className = 'hud'
   root.innerHTML = `
     <div class="hud-hook"></div>
     <div class="hud-panel">
+      <button class="hud-prev" style="align-self:flex-start;margin-bottom:8px;padding:4px 12px;border-radius:14px;border:1px solid #3a5170;background:rgba(255,255,255,.06);color:#bcd0e6;font-size:13px;cursor:pointer"></button>
       <div class="hud-goal"></div>
       <div class="hud-slot" id="hud-slot"></div>
       <button class="hud-launch"></button>
@@ -21,11 +22,14 @@ export function createHud(mount, { onLaunch, onNext }) {
   mount.appendChild(root)
   const launchBtn = root.querySelector('.hud-launch')
   const nextBtn = root.querySelector('.hud-next')
+  const prevBtn = root.querySelector('.hud-prev')
   function relocalize() {
     launchBtn.textContent = t({ zh: '🚀 发射', en: '🚀 Launch' })
     nextBtn.textContent = t({ zh: '下一关 →', en: 'Next →' })
+    prevBtn.textContent = t({ zh: '← 上一关', en: '← Prev' })
   }
   relocalize()
+  prevBtn.addEventListener('click', onPrev)
 
   const hookEl = root.querySelector('.hud-hook')
   const goalEl = root.querySelector('.hud-goal')
@@ -39,6 +43,7 @@ export function createHud(mount, { onLaunch, onNext }) {
   return {
     slot: root.querySelector('#hud-slot'),
     relocalize,
+    setPrevVisible: (v) => { prevBtn.style.display = v ? '' : 'none' },
     setHook: (t) => { hookEl.textContent = t },
     setGoal: (t) => { goalEl.textContent = `🎯 ${t}` },
     setFeedback: ({ goalMet, message }) => {

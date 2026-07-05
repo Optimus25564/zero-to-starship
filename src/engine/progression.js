@@ -28,5 +28,11 @@ export function createProgression(levelIds) {
     return null
   }
 
-  return { isUnlocked, complete, getStars, nextLockedUnlockedId }
+  // 顺序上的上一关（已玩过、必然解锁）；首关返回 null
+  function prevId(id) {
+    const i = indexOf(id)
+    return i > 0 ? levelIds[i - 1] : null
+  }
+
+  return { isUnlocked, complete, getStars, nextLockedUnlockedId, prevId }
 }

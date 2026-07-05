@@ -99,8 +99,13 @@ export function startGame(mount) {
           const next = progression.nextLockedUnlockedId()
           if (next) loadLevel(next)
         },
+        onPrev: () => {
+          const prev = progression.prevId(current.id)
+          if (prev) loadLevel(prev)
+        },
       })
     }
+    hud.setPrevVisible(!!progression.prevId(level.id))   // 首关隐藏"上一关"
     hud.setHook(t(level.hook))
     hud.setGoal(t(level.goal.text))
     scene.setStage(level.stage || 'pad')
