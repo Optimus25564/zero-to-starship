@@ -30,6 +30,7 @@ export function createBlueprintOverlay(mount) {
   return {
     update,
     relocalize,
+    setTop: (px) => { formulaEl.style.top = `${px}px` },   // 让公式条排到 hook 下方，避免重叠
     dispose: () => { if (root.parentNode) root.parentNode.removeChild(root) },
   }
 }

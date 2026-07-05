@@ -85,6 +85,11 @@ export function startGame(mount) {
     }
   }
 
+  function positionFormula() {
+    if (hud && hud.hookEl) overlay.setTop(hud.hookEl.getBoundingClientRect().bottom + 8)
+  }
+  window.addEventListener('resize', positionFormula)
+
   function loadLevel(id) {
     const level = LEVELS.find((l) => l.id === id)
     if (!level) return
@@ -108,6 +113,7 @@ export function startGame(mount) {
     hud.setPrevVisible(!!progression.prevId(level.id))   // 首关隐藏"上一关"
     hud.setHook(t(level.hook))
     hud.setGoal(t(level.goal.text))
+    requestAnimationFrame(positionFormula)   // hook 高度随语言变化 → 公式条排到它下方
     scene.setStage(level.stage || 'pad')
     scene.setVehicle(level.vehicle || (level.stage === 'separate' ? 'stack' : 'ship'))
     scene.setRecovery(level.recovery || 'simple')
@@ -145,6 +151,6 @@ export function startGame(mount) {
   loadLevel(progression.nextLockedUnlockedId())
 
   return {
-    dispose: () => { offLang(); if (langBtn.parentNode) langBtn.parentNode.removeChild(langBtn); scene.dispose(); overlay.dispose(); partLabel.destroy(); diagramPanel.destroy() },
+    dispose: () => { offLang(); window.removeEventListener('resize', positionFormula); if (langBtn.parentNode) langBtn.parentNode.removeChild(langBtn); scene.dispose(); overlay.dispose(); partLabel.destroy(); diagramPanel.destroy() },
   }
 }

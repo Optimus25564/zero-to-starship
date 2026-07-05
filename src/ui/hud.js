@@ -42,6 +42,7 @@ export function createHud(mount, { onLaunch, onNext, onPrev }) {
 
   return {
     slot: root.querySelector('#hud-slot'),
+    hookEl,
     relocalize,
     setPrevVisible: (v) => { prevBtn.style.display = v ? '' : 'none' },
     setHook: (t) => { hookEl.textContent = t },
