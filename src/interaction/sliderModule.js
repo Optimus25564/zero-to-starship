@@ -1,3 +1,5 @@
+import { t } from '../i18n.js'
+
 export function createSliderModule(container, params, initialValues, onChange) {
   const values = { ...initialValues }
   const valueLabels = {}
@@ -7,7 +9,7 @@ export function createSliderModule(container, params, initialValues, onChange) {
     row.className = 'slider-row'
 
     const label = document.createElement('label')
-    label.textContent = p.label
+    label.textContent = t(p.label)
     row.appendChild(label)
 
     const input = document.createElement('input')
@@ -19,7 +21,7 @@ export function createSliderModule(container, params, initialValues, onChange) {
 
     const readout = document.createElement('span')
     readout.className = 'slider-readout'
-    const render = () => { readout.textContent = `${values[p.key]} ${p.unit}`.trim() }
+    const render = () => { readout.textContent = `${values[p.key]} ${t(p.unit)}`.trim() }
     render()
     valueLabels[p.key] = render
 

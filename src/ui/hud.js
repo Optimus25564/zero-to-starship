@@ -1,3 +1,5 @@
+import { t } from '../i18n.js'
+
 export function createHud(mount, { onLaunch, onNext }) {
   const root = document.createElement('div')
   root.className = 'hud'
@@ -6,17 +8,24 @@ export function createHud(mount, { onLaunch, onNext }) {
     <div class="hud-panel">
       <div class="hud-goal"></div>
       <div class="hud-slot" id="hud-slot"></div>
-      <button class="hud-launch">🚀 发射</button>
+      <button class="hud-launch"></button>
       <div class="hud-feedback"></div>
     </div>
     <div class="hud-milestone hidden">
       <div class="hud-stars"></div>
       <h3 class="hud-mile-title"></h3>
       <p class="hud-mile-fact"></p>
-      <button class="hud-next">下一关 →</button>
+      <button class="hud-next"></button>
     </div>
   `
   mount.appendChild(root)
+  const launchBtn = root.querySelector('.hud-launch')
+  const nextBtn = root.querySelector('.hud-next')
+  function relocalize() {
+    launchBtn.textContent = t({ zh: '🚀 发射', en: '🚀 Launch' })
+    nextBtn.textContent = t({ zh: '下一关 →', en: 'Next →' })
+  }
+  relocalize()
 
   const hookEl = root.querySelector('.hud-hook')
   const goalEl = root.querySelector('.hud-goal')
@@ -24,11 +33,12 @@ export function createHud(mount, { onLaunch, onNext }) {
   const milestoneEl = root.querySelector('.hud-milestone')
   const starsEl = root.querySelector('.hud-stars')
 
-  root.querySelector('.hud-launch').addEventListener('click', onLaunch)
-  root.querySelector('.hud-next').addEventListener('click', onNext)
+  launchBtn.addEventListener('click', onLaunch)
+  nextBtn.addEventListener('click', onNext)
 
   return {
     slot: root.querySelector('#hud-slot'),
+    relocalize,
     setHook: (t) => { hookEl.textContent = t },
     setGoal: (t) => { goalEl.textContent = `🎯 ${t}` },
     setFeedback: ({ goalMet, message }) => {

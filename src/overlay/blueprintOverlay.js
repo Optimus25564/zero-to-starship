@@ -1,14 +1,21 @@
+import { t } from '../i18n.js'
+
 export function createBlueprintOverlay(mount) {
   const root = document.createElement('div')
   root.className = 'blueprint-overlay'
   root.innerHTML = `
     <div class="bp-formula" id="bp-formula"></div>
     <div class="bp-arrows">
-      <div class="bp-arrow bp-thrust"><span>推力 ↑</span><i id="bp-thrust-bar"></i></div>
-      <div class="bp-arrow bp-weight"><span>重力 ↓</span><i id="bp-weight-bar"></i></div>
+      <div class="bp-arrow bp-thrust"><span class="bp-lbl-thrust"></span><i id="bp-thrust-bar"></i></div>
+      <div class="bp-arrow bp-weight"><span class="bp-lbl-weight"></span><i id="bp-weight-bar"></i></div>
     </div>
   `
   mount.appendChild(root)
+  function relocalize() {
+    root.querySelector('.bp-lbl-thrust').textContent = t({ zh: '推力 ↑', en: 'Thrust ↑' })
+    root.querySelector('.bp-lbl-weight').textContent = t({ zh: '重力 ↓', en: 'Weight ↓' })
+  }
+  relocalize()
 
   const formulaEl = root.querySelector('#bp-formula')
   const thrustBar = root.querySelector('#bp-thrust-bar')
@@ -22,6 +29,7 @@ export function createBlueprintOverlay(mount) {
 
   return {
     update,
+    relocalize,
     dispose: () => { if (root.parentNode) root.parentNode.removeChild(root) },
   }
 }

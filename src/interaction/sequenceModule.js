@@ -1,3 +1,5 @@
+import { t } from '../i18n.js'
+
 export function createSequenceModule(container, steps, onChange) {
   let order = []
   const buttons = {}
@@ -12,7 +14,7 @@ export function createSequenceModule(container, steps, onChange) {
 
   function renderOrdered() {
     orderedList.textContent = order
-      .map((key) => steps.find((s) => s.key === key)?.label ?? key)
+      .map((key) => t(steps.find((s) => s.key === key)?.label) ?? key)
       .join(' → ')
   }
 
@@ -20,7 +22,7 @@ export function createSequenceModule(container, steps, onChange) {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'seq-step'
-    btn.textContent = step.label
+    btn.textContent = t(step.label)
 
     btn.addEventListener('click', () => {
       if (btn.classList.contains('used')) return
@@ -37,7 +39,7 @@ export function createSequenceModule(container, steps, onChange) {
   const resetBtn = document.createElement('button')
   resetBtn.type = 'button'
   resetBtn.className = 'seq-reset'
-  resetBtn.textContent = '重置'
+  resetBtn.textContent = t({ zh: '重置', en: 'Reset' })
   resetBtn.addEventListener('click', () => {
     order = []
     for (const key of Object.keys(buttons)) buttons[key].classList.remove('used')

@@ -1,3 +1,5 @@
+import { t } from '../i18n.js'
+
 export function createChoiceModule(container, options, initialKey, onChange) {
   let selected = initialKey
   const buttons = {}
@@ -12,7 +14,7 @@ export function createChoiceModule(container, options, initialKey, onChange) {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'choice-option'
-    btn.textContent = opt.label
+    btn.textContent = t(opt.label)
 
     btn.addEventListener('click', () => {
       selected = opt.key

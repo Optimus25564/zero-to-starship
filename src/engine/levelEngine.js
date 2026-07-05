@@ -9,13 +9,34 @@ import { createRocketScene } from '../scene/rocketScene.js'
 import { createBlueprintOverlay } from '../overlay/blueprintOverlay.js'
 import { createHud } from '../ui/hud.js'
 import { createPartLabel } from '../ui/partLabel.js'
+import { createDiagramPanel } from '../ui/diagramPanel.js'
+import { getLang, setLang, onLang, t } from '../i18n.js'
 
 export function startGame(mount) {
   const progression = createProgression(LEVELS.map((l) => l.id))
   const scene = createRocketScene(mount)
   const overlay = createBlueprintOverlay(mount)
   const partLabel = createPartLabel(mount)
-  scene.setHoverHandler((info) => (info ? partLabel.show(info) : partLabel.hide()))
+  const diagramPanel = createDiagramPanel(mount)   // 悬停火箭浮出的剖面/3D 图
+  scene.setHoverHandler((info) => {
+    if (info) partLabel.show(info); else partLabel.hide()
+    diagramPanel.setHoverVisible(!!info)
+  })
+
+  // 语言开关（中 / EN）
+  const langBtn = document.createElement('button')
+  langBtn.className = 'lang-toggle'
+  langBtn.style.cssText = 'position:fixed;top:12px;right:14px;z-index:40;padding:5px 13px;border-radius:16px;border:1px solid #2f6bff;background:rgba(9,14,26,.92);color:#cfe0ff;font:600 13px/1 system-ui,sans-serif;cursor:pointer'
+  mount.appendChild(langBtn)
+  const syncLangBtn = () => { langBtn.textContent = getLang() === 'zh' ? 'EN' : '中文' }
+  syncLangBtn()
+  langBtn.addEventListener('click', () => setLang(getLang() === 'zh' ? 'en' : 'zh'))
+  const offLang = onLang(() => {
+    syncLangBtn()
+    if (hud) hud.relocalize()
+    overlay.relocalize()
+    if (current) loadLevel(current.id)   // 重载当前关，全部文案按新语言重出
+  })
 
   let current, params, interactionMod, hud
 
@@ -28,7 +49,7 @@ export function startGame(mount) {
       goalMet: false,
     })
     overlay.update({
-      formulaText: current.formulaHUD(params, derived),
+      formulaText: current.formulaHUD(params, derived, getLang()),
       thrust: derived.thrust ?? 0,
       weight: derived.weight ?? 0,
     })
@@ -49,18 +70,18 @@ export function startGame(mount) {
     })
     scene.play(goalMet) // 播发射/着陆动画
     const message = goalMet
-      ? '达标！火箭表现符合目标。'
+      ? t({ zh: '达标！火箭表现符合目标。', en: 'Target met! The rocket performs as required.' })
       : current.interaction === 'choice'
-        ? `能飞——但${derived.chosen.note} 换一种再试试？`
-        : '还差一点，调整参数再试试。'
+        ? t({ zh: `能飞——但${t(derived.chosen.note)} 换一种再试试？`, en: `It flies — but ${t(derived.chosen.note)} Try another?` })
+        : t({ zh: '还差一点，调整参数再试试。', en: 'Not quite — tweak the parameters and try again.' })
     hud.setFeedback({ goalMet, message })
     if (goalMet) {
       const stars = starsFor(derived)
       progression.complete(current.id, stars)
       const m = MILESTONES[current.milestoneId]
       // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-      const delay = current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : 0
-      setTimeout(() => hud.showMilestone({ title: m.title, fact: m.fact, stars }), delay)
+      const delay = current.recovery === 'full' ? 8800 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
+      setTimeout(() => hud.showMilestone({ title: t(m.title), fact: t(m.fact), stars }), delay)
     }
   }
 
@@ -80,10 +101,15 @@ export function startGame(mount) {
         },
       })
     }
-    hud.setHook(level.hook)
-    hud.setGoal(level.goal.text)
+    hud.setHook(t(level.hook))
+    hud.setGoal(t(level.goal.text))
     scene.setStage(level.stage || 'pad')
+    scene.setVehicle(level.vehicle || (level.stage === 'separate' ? 'stack' : 'ship'))
+    scene.setRecovery(level.recovery || 'simple')
+    scene.setPadRise(!!level.padRise)
     scene.setHighlight(level.highlight || null)
+    // 侧边图面板只保留"没法画在火箭上的化学流程"（火星 Sabatier / 8.1）；其余信息就地标在主火箭上
+    diagramPanel.setDiagram(level.id === '8.1' ? level.diagram : null)
 
     if (interactionMod) interactionMod.destroy()
     if (level.interaction === 'choice') {
@@ -113,6 +139,6 @@ export function startGame(mount) {
   loadLevel(progression.nextLockedUnlockedId())
 
   return {
-    dispose: () => { scene.dispose(); overlay.dispose(); partLabel.destroy() },
+    dispose: () => { offLang(); if (langBtn.parentNode) langBtn.parentNode.removeChild(langBtn); scene.dispose(); overlay.dispose(); partLabel.destroy(); diagramPanel.destroy() },
   }
 }
