@@ -45,7 +45,7 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .hud-next { margin-top: 16px; padding: 10px 20px; border: 0; border-radius: 8px; background: #2f6bff; color: #fff; cursor: pointer; }
 
 .diagram-root { position: fixed; inset: 0; pointer-events: none; }
-.diagram-hint { position: absolute; top: 16px; right: 16px; pointer-events: none; background: rgba(10,16,32,.8); color: #bcd0e6; border: 1px solid #2f6bff; border-radius: 8px; padding: 6px 11px; font-size: 12px; }
+.diagram-hint { position: absolute; top: 52px; right: 16px; pointer-events: none; background: rgba(10,16,32,.8); color: #bcd0e6; border: 1px solid #2f6bff; border-radius: 8px; padding: 6px 11px; font-size: 12px; }
 .diagram-hint.hidden { display: none; }
 .diagram-panel { position: absolute; top: 0; right: 0; height: 100%; width: 380px; max-width: 86vw; box-sizing: border-box; background: rgba(9,14,26,.96); border-left: 1px solid #2f6bff; padding: 22px 24px; overflow-y: auto; pointer-events: auto; transform: translateX(0); transition: transform .22s ease; }
 .diagram-panel.hidden { transform: translateX(103%); }
