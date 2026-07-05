@@ -20,7 +20,7 @@ export const level = {
   steps: STEPS,
   compute: (p) => ({ correct: eq(p.order || [], CORRECT), done: (p.order || []).length === CORRECT.length }),
   goal: { text: { zh: '按星舰"热分离"排出正确时序', en: 'Arrange the correct sequence for Starship\'s "hot-staging"' }, check: (d) => d.correct },
-  formulaHUD: (p, d, lang) => (d.correct ? (lang === 'en' ? 'Sequence correct! Booster throttles down → upper stage ignites on top → exhaust pushes them apart → booster drops the ring and heads home.' : '时序正确！一级降推力 → 二级在顶上点火 → 喷流顶开分离 → 一级抛环返场。') : (lang === 'en' ? `Arranged ${(p.order || []).length}/${STEPS.length} steps` : `已排 ${(p.order || []).length}/${STEPS.length} 步`)),
+  formulaHUD: (p, d, lang) => (d.correct ? (lang === 'en' ? 'Sequence correct — hot-staging succeeded ✓' : '时序正确 ✓ 热分离成功') : (lang === 'en' ? `Arranged ${(p.order || []).length}/${STEPS.length} steps` : `已排 ${(p.order || []).length}/${STEPS.length} 步`)),
   milestoneId: 'stage-separation-timing',
 }
 

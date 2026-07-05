@@ -39,7 +39,7 @@ export function createSequenceModule(container, steps, onChange) {
   const resetBtn = document.createElement('button')
   resetBtn.type = 'button'
   resetBtn.className = 'seq-reset'
-  resetBtn.textContent = t({ zh: '重置', en: 'Reset' })
+  resetBtn.textContent = t({ zh: '↺ 重置', en: '↺ Reset' })
   resetBtn.addEventListener('click', () => {
     order = []
     for (const key of Object.keys(buttons)) buttons[key].classList.remove('used')

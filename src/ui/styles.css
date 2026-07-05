@@ -21,6 +21,15 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .hud-feedback.ok { color: #66ffb0; }
 .hud-feedback.bad { color: #ff8888; }
 
+/* 时序题：4 个待选步骤=蓝色实心筹码；重置=灰色虚线幽灵按钮，一眼区分 */
+.seq-steps { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+.seq-step { padding: 6px 12px; border: 1px solid #3a5fa0; border-radius: 8px; background: rgba(47,107,255,.16); color: #dbe6f7; font-size: 13px; cursor: pointer; }
+.seq-step:hover { background: rgba(47,107,255,.3); }
+.seq-step.used { opacity: .35; border-style: dashed; cursor: default; pointer-events: none; }
+.seq-ordered { font-size: 13px; color: #cfe0f2; min-height: 18px; margin: 2px 0 6px; }
+.seq-reset { padding: 3px 12px 3px 9px; border: 1px dashed #5a6472; border-radius: 14px; background: transparent; color: #9fb0c4; font-size: 12px; cursor: pointer; }
+.seq-reset:hover { color: #e6ebf2; border-color: #8aa0b8; }
+
 .blueprint-overlay { position: fixed; inset: 0; pointer-events: none; }
 .bp-formula { position: absolute; top: 92px; left: 16px; max-width: 380px; text-align: left; background: rgba(0,40,80,.72); border: 1px solid #3aa0ff; color: #bfe4ff; padding: 8px 14px; border-radius: 8px; font-family: ui-monospace, monospace; font-size: 13px; }
 .bp-arrows { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); display: flex; gap: 24px; align-items: flex-end; }
