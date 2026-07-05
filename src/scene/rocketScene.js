@@ -507,7 +507,7 @@ export function createRocketScene(mount) {
   }
   function frameCamera() {
     if (vehicle === 'stack') { camera.position.set(9, 3.6, 22); camera.lookAt(0, 7.6, 0) }        // 全箭很高，拉远仰拍
-    else if (vehicle === 'booster') { camera.position.set(8, 3, 19.5); camera.lookAt(0, 6, 0) } // 一级较高，拉远抬高取景
+    else if (vehicle === 'booster') { camera.position.set(9, 4.5, 25); camera.lookAt(0, 7.5, 0) } // 拉远抬高：容得下高空掉头 + 塔架夹取
     else { camera.position.set(5.4, 1.1, 12.5); camera.lookAt(0, 4.2, 0) }                          // 二级：原英雄机位
   }
   function setVehicle(v) {
@@ -573,8 +573,8 @@ export function createRocketScene(mount) {
     else if (stage === 'descent') {
       ground.visible = pad.visible = tower.visible = true   // 回收：完整发射场(地面+台座+塔+筷子)出现，和起飞时一样
       if (success && vehicle === 'booster' && recoveryStyle === 'full') {
-        // 一级回收全流程：从高空掉头开始
-        rocketY = 8.5; rocket.position.x = 2.8; rocket.rotation.z = 1.9
+        // 一级回收全流程：从高空掉头开始（远离塔架）
+        rocketY = 14; rocket.position.x = 3.4; rocket.rotation.z = 1.9
         setFinsDeploy(0.25); reentryMat.opacity = 0
         anim = { type: 'recover', t: 0 }
       } else { rocketY = 12; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 } }
@@ -633,19 +633,19 @@ export function createRocketScene(mount) {
         // 一级回收全流程：① 太空掉头(回推) ② 展栅格舵 ③ 再入(保持再入角+再入点火+高温红光) ④ 着陆点火被夹
         const t = anim.t
         let tgtY, tgtX, tgtRot, burn = 0, glow = 0, fins = 1
-        if (t < 2.0) {                    // ① 掉头 · 回推点火
-          tgtY = 8.5; tgtX = 1.6; tgtRot = 1.25
-          burn = t < 0.9 ? 900000 : 0; fins = 0.25
-        } else if (t < 3.6) {             // ② 展开栅格舵
-          tgtY = 7.2; tgtX = 0.8; tgtRot = 0.42
-          fins = Math.min(1, (t - 2.0) / 1.3)
-        } else if (t < 6.2) {             // ③ 再入（斜切的再入角）· 再入点火 · 高温红光
-          tgtY = 4.4; tgtX = 0.3; tgtRot = 0.42 + Math.sin(t * 8) * 0.03   // 栅格舵微控的姿态摆动
-          burn = (t > 4.3 && t < 5.4) ? 520000 : 0
-          glow = t < 5.7 ? Math.min(0.6, (t - 3.6) / 0.9) : Math.max(0, 0.6 - (t - 5.7) * 1.2)
-        } else {                          // ④ 竖直 · 着陆点火 · 被夹
+        if (t < 2.5) {                    // ① 高空掉头 · 回推点火（远高于塔架）
+          tgtY = 14; tgtX = 2.4; tgtRot = 1.25
+          burn = t < 1.0 ? 900000 : 0; fins = 0.25
+        } else if (t < 4.2) {             // ② 展开栅格舵 · 转到再入角
+          tgtY = 11.5; tgtX = 1.2; tgtRot = 0.42
+          fins = Math.min(1, (t - 2.5) / 1.4)
+        } else if (t < 7.2) {             // ③ 再入点火下落 · 高温红光（保持再入角斜切下坠）
+          tgtY = 5.5; tgtX = 0.3; tgtRot = 0.42 + Math.sin(t * 8) * 0.03
+          burn = (t > 4.6 && t < 6.2) ? 520000 : 0
+          glow = t < 6.6 ? Math.min(0.6, (t - 4.2) / 1.0) : Math.max(0, 0.6 - (t - 6.6) * 1.2)
+        } else {                          // ④ 竖直 · 着陆点火悬停 · 被夹
           tgtY = 3; tgtX = 0; tgtRot = 0
-          burn = rocketY > 3.1 ? 480000 : 0   // 到位即关机被夹
+          burn = rocketY > 3.15 ? 480000 : 0   // 悬停减速，到位关机被夹
         }
         rocketY += (tgtY - rocketY) * 0.05
         rocket.position.x += (tgtX - rocket.position.x) * 0.06

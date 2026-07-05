@@ -23,6 +23,8 @@ export function startGame(mount) {
     diagramPanel.setHoverVisible(!!info)
   })
 
+  let milestoneTimer = null   // 里程碑卡的延时器：换关/重发时清掉，防止上一关的卡串到下一关
+
   // 语言开关（中 / EN）
   const langBtn = document.createElement('button')
   langBtn.className = 'lang-toggle'
@@ -85,8 +87,9 @@ export function startGame(mount) {
       progression.complete(current.id, stars)
       const m = MILESTONES[current.milestoneId]
       // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-      const delay = current.recovery === 'full' ? 8800 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
-      setTimeout(() => hud.showMilestone({ title: t(m.title), fact: t(m.fact), stars }), delay)
+      const delay = current.recovery === 'full' ? 10000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
+      clearTimeout(milestoneTimer)
+      milestoneTimer = setTimeout(() => hud.showMilestone({ title: t(m.title), fact: t(m.fact), stars }), delay)
     }
   }
 
@@ -100,6 +103,7 @@ export function startGame(mount) {
     if (!level) return
     current = level
 
+    clearTimeout(milestoneTimer)   // 清掉上一关可能挂着的里程碑延时
     if (hud) hud.reset()
     // 首次创建 HUD；之后复用同一个 HUD，仅重建滑块
     if (!hud) {
