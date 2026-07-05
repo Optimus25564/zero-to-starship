@@ -422,7 +422,7 @@ export function createRocketScene(mount) {
   const efMat = new THREE.MeshBasicMaterial({ map: efTex, transparent: true, depthTest: false, depthWrite: false, fog: false })
   const engineFlow = new THREE.Mesh(new THREE.PlaneGeometry(efW, efH), efMat)
   engineFlow.position.set(0, 0.25, 0.04); engineFlow.renderOrder = 12; engineFlow.visible = false
-  ship.add(engineFlow)
+  rocket.add(engineFlow)   // 挂在 rocket 上：按当前工作级（一级/二级）就地定位
 
   // 一级发动机高亮：点明"推力/排气来自一级"（1-1 讲推力时用），虚线框 + 标签贴在一级发动机段
   const bhW = 1.8, bhH = 1.5
@@ -714,15 +714,20 @@ export function createRocketScene(mount) {
     } else {
       highlight.visible = false
     }
-    // 发动机气路标注：划过发动机 / 本关聚焦发动机时，就地在主火箭上画出气体怎么走
-    const engineActive = (hoverPart === 'engine' || baseHighlight === 'engine') && ship.visible
+    // 发动机气路标注：划过发动机 / 本关聚焦发动机时，就地画出气体怎么走。
+    // 关键：分离前正在喷火的是一级 → 标在一级发动机；仅二级时才标在二级。
+    const engineFocus = baseHighlight === 'engine' || hoverPart === 'engine' || hoverPart === 'b-engine'
+    const engineActive = engineFocus && (ship.visible || vehicle === 'booster')
     engineFlow.visible = engineActive
     if (engineActive) {
-      efMat.opacity = hoverPart === 'engine' ? 1 : 0.6 + (Math.sin(time * 4) + 1) * 0.2
-      if (hoverPart === 'engine') flame.visible = glow.visible = false   // 悬停检视时收起尾焰，气路看得清
+      const onBooster = (vehicle === 'stack' || vehicle === 'booster') && hoverPart !== 'engine'  // 一级在场且非专门划二级机
+      engineFlow.position.y = onBooster ? 0.55 : ship.position.y + 0.25   // 一级发动机（底部）/ 二级发动机
+      const hovering = hoverPart === 'engine' || hoverPart === 'b-engine'
+      efMat.opacity = hovering ? 1 : 0.6 + (Math.sin(time * 4) + 1) * 0.2
+      if (hovering) flame.visible = glow.visible = false   // 悬停检视时收起尾焰，气路看得清
     }
-    // 一级内部剖面：悬停一级时浮现（堆叠或仅一级时）
-    const bHoverKey = hoverPart && hoverPart.slice(0, 2) === 'b-' ? hoverPart : null
+    // 一级内部剖面：悬停一级贮箱时浮现（发动机段改由气路标注表达，不进剖面）
+    const bHoverKey = hoverPart && hoverPart.slice(0, 2) === 'b-' && hoverPart !== 'b-engine' ? hoverPart : null
     if (bHoverKey && (vehicle === 'stack' || vehicle === 'booster')) {
       boosterCut.visible = true
       if (bHoverKey !== bcActive) { drawBoosterCut(bHoverKey); bcActive = bHoverKey }
