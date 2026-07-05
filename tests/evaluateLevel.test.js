@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { LEVELS, defaultParams } from '../src/content/levels.js'
+import { LEVELS, defaultParams, ORDER } from '../src/content/levels.js'
 import { MILESTONES } from '../src/content/milestones.js'
 import { evaluateLevel } from '../src/engine/evaluateLevel.js'
 
@@ -13,14 +13,17 @@ const cmpId = (a, b) => {
 }
 
 describe('LEVELS 配置', () => {
-  it('包含既有核心关卡，且按数值 id 升序排列', () => {
+  it('包含既有核心关卡，且严格按 ORDER 顺序表排列（级间分离已提前）', () => {
     const ids = LEVELS.map((l) => l.id)
     for (const core of ['1.1', '1.2', '1.3', '2.1']) expect(ids).toContain(core)
-    expect(ids).toEqual([...ids].sort(cmpId))
+    expect(ids).toEqual(ORDER)                          // 顺序由 ORDER 决定
+    expect(ORDER.indexOf('3.2')).toBeLessThan(ORDER.indexOf('2.1'))  // 分离在"仅二级"关卡之前
   })
   it('每关都有目标文案，且按交互类型具备对应字段', () => {
     for (const l of LEVELS) {
-      expect(typeof l.goal.text).toBe('string')
+      // goal.text 现在可能是 { zh, en } 双语对象或纯字符串
+      const gt = l.goal.text
+      expect(typeof gt === 'string' || (gt && typeof gt.zh === 'string' && typeof gt.en === 'string')).toBe(true)
       expect(typeof l.formulaHUD).toBe('function')
       expect(typeof l.goal.check).toBe('function')
       if (l.interaction === 'choice') {
