@@ -99,31 +99,69 @@ export function createRocketScene(mount) {
     tex.anisotropy = 4
     return tex
   }
-  // 地球贴图：深蓝海洋 + 大陆 + 云。贴到大球上、置于场景下方，露出弯曲的地平弧线。
+  // 地球表面贴图：深蓝海洋 + 可辨认的大陆轮廓（绿地/沙漠/极地冰）。日夜由太阳光照自然形成。
   function makeEarthTexture() {
-    const cw = 1024, ch = 512
+    const cw = 2048, ch = 1024
     const c = document.createElement('canvas'); c.width = cw; c.height = ch
     const ctx = c.getContext('2d')
+    // 海洋：饱和蓝（赤道更亮）——"蓝色弹珠"
     const g = ctx.createLinearGradient(0, 0, 0, ch)
-    g.addColorStop(0, '#0a3c86'); g.addColorStop(0.5, '#1466b8'); g.addColorStop(1, '#0c4a97')
+    g.addColorStop(0.0, '#0b3f86'); g.addColorStop(0.5, '#1f78d4'); g.addColorStop(1.0, '#0a3a7c')
     ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch)
-    // 大陆块（绿褐不规则斑）
-    for (let i = 0; i < 26; i++) {
-      const x = Math.random() * cw, y = Math.random() * ch
-      const green = Math.random() < 0.55
-      ctx.fillStyle = green ? `rgba(78,132,72,${0.55 + Math.random() * 0.3})` : `rgba(150,126,84,${0.5 + Math.random() * 0.3})`
-      ctx.beginPath()
-      const n = 7 + ((Math.random() * 5) | 0), rr = 30 + Math.random() * 70
-      for (let k = 0; k <= n; k++) { const a = (k / n) * 7, r = rr * (0.5 + Math.random() * 0.7); const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.7; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py) }
+    // 大陆用平滑闭合曲线画（u,v 归一化坐标 → 像素）
+    const blob = (pts, fill) => {
+      ctx.fillStyle = fill; ctx.beginPath()
+      const P = pts.map(([u, v]) => [u * cw, v * ch])
+      ctx.moveTo(P[0][0], P[0][1])
+      for (let i = 0; i < P.length; i++) {
+        const a = P[i], b = P[(i + 1) % P.length]
+        ctx.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+      }
       ctx.closePath(); ctx.fill()
     }
-    // 云带（白色柔絮）
-    for (let i = 0; i < 90; i++) {
-      const x = Math.random() * cw, y = Math.random() * ch
-      ctx.fillStyle = `rgba(245,249,255,${0.12 + Math.random() * 0.34})`
-      ctx.beginPath(); ctx.ellipse(x, y, 20 + Math.random() * 55, 7 + Math.random() * 13, Math.random(), 0, 7); ctx.fill()
+    const LAND = '#3a7540', DESERT = '#a08a58', ICE = '#eaf3fb'
+    // 北美
+    blob([[0.15, 0.30], [0.22, 0.22], [0.30, 0.22], [0.34, 0.30], [0.32, 0.40], [0.27, 0.46], [0.22, 0.45], [0.17, 0.40], [0.14, 0.34]], LAND)
+    // 南美
+    blob([[0.30, 0.55], [0.36, 0.55], [0.385, 0.63], [0.35, 0.76], [0.315, 0.84], [0.30, 0.72], [0.285, 0.60]], LAND)
+    // 格陵兰
+    blob([[0.40, 0.15], [0.46, 0.13], [0.485, 0.19], [0.45, 0.24], [0.40, 0.21]], ICE)
+    // 非洲
+    blob([[0.50, 0.44], [0.55, 0.43], [0.605, 0.50], [0.60, 0.60], [0.565, 0.71], [0.53, 0.66], [0.505, 0.56], [0.495, 0.48]], LAND)
+    // 欧洲
+    blob([[0.49, 0.30], [0.55, 0.27], [0.605, 0.29], [0.60, 0.36], [0.55, 0.40], [0.50, 0.38]], LAND)
+    // 亚洲
+    blob([[0.595, 0.28], [0.66, 0.24], [0.75, 0.25], [0.82, 0.30], [0.81, 0.40], [0.72, 0.44], [0.64, 0.42], [0.60, 0.36]], LAND)
+    // 印度次大陆
+    blob([[0.66, 0.44], [0.70, 0.44], [0.695, 0.52], [0.665, 0.50]], LAND)
+    // 澳大利亚
+    blob([[0.78, 0.64], [0.86, 0.63], [0.905, 0.68], [0.87, 0.74], [0.80, 0.73], [0.775, 0.68]], LAND)
+    // 沙漠覆盖（撒哈拉 / 阿拉伯 / 中亚 / 澳洲内陆）
+    blob([[0.50, 0.45], [0.57, 0.44], [0.605, 0.49], [0.58, 0.53], [0.51, 0.51]], DESERT)   // 撒哈拉
+    blob([[0.60, 0.45], [0.65, 0.44], [0.66, 0.50], [0.61, 0.50]], DESERT)                   // 阿拉伯
+    blob([[0.80, 0.66], [0.87, 0.66], [0.87, 0.71], [0.80, 0.71]], DESERT)                   // 澳洲内陆
+    // 极地冰盖（收窄，避免大片惨白）
+    ctx.fillStyle = ICE; ctx.fillRect(0, 0, cw, ch * 0.04); ctx.fillRect(0, ch * 0.965, cw, ch * 0.035)
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4
+    return tex
+  }
+  // 云层贴图（独立半透明球，缓慢自转）
+  function makeCloudTexture() {
+    const cw = 2048, ch = 1024
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch
+    const ctx = c.getContext('2d'); ctx.clearRect(0, 0, cw, ch)
+    // 成团的云系（每团由几片叠加，像旋涡云系而非零星散点）
+    for (let s = 0; s < 55; s++) {
+      const cx = Math.random() * cw, cy = ch * 0.08 + Math.random() * ch * 0.84
+      const puffs = 5 + ((Math.random() * 7) | 0)
+      for (let i = 0; i < puffs; i++) {
+        const x = cx + (Math.random() - 0.5) * 220, y = cy + (Math.random() - 0.5) * 90
+        const rx = 26 + Math.random() * 90, ry = 10 + Math.random() * 26
+        ctx.fillStyle = `rgba(255,255,255,${0.16 + Math.random() * 0.42})`
+        ctx.beginPath(); ctx.ellipse(x, y, rx, ry, Math.random() * 3, 0, 7); ctx.fill()
+      }
     }
-    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4
     return tex
   }
 
@@ -138,29 +176,41 @@ export function createRocketScene(mount) {
     scene.environment = skyEnvTex
     disposables.push(skyRT, spaceRT, pmrem)
   } catch (e) { console.warn('env map skipped:', e) }
-  // ---- 地球：一颗大球置于场景下方，露出弯曲的地平弧线（仅在轨 'space' 环境显示）----
-  const earthR = 120
+  // ---- 地球：真实感大球（可辨认大陆 + 云层 + 大气辉光），置于场景下方露出弯曲地平弧线 ----
+  const earthR = 60
+  const earthPos = new THREE.Vector3(0, -earthR - 3, -20)   // 顶点约在 y≈-3：镜头在球外，看到明显弯曲的蓝色星球 + 上方深空
   const earthTex = makeEarthTexture(); disposables.push(earthTex)
   const earth = new THREE.Mesh(
-    new THREE.SphereGeometry(earthR, 64, 48),
-    new THREE.MeshStandardMaterial({ map: earthTex, roughness: 1.0, metalness: 0.0, emissive: 0x0a2748, emissiveIntensity: 0.35, fog: false })
+    new THREE.SphereGeometry(earthR, 64, 44),
+    new THREE.MeshStandardMaterial({ map: earthTex, roughness: 0.92, metalness: 0.0, emissive: 0x1e4f96, emissiveIntensity: 0.5, fog: false })
   )
-  earth.position.set(0, -earthR - 1.5, -16)   // 顶点约在 y≈-1.5，弧线横在画面下部
+  // 倾斜地球，让【赤道海洋】而非极地冰盖朝向镜头（否则从正上方看到的是北极冰盖，一片惨白）
+  earth.position.copy(earthPos); earth.rotation.set(-1.4, 2.6, 0)
   earth.visible = false; scene.add(earth)
-  // 大气辉光：比地球略大的一层背面加色蓝壳，边缘透出蓝光
-  const atmo = new THREE.Mesh(
-    new THREE.SphereGeometry(earthR * 1.045, 64, 48),
-    new THREE.MeshBasicMaterial({ color: 0x5aa8ff, transparent: true, opacity: 0.22, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
+  const cloudTex = makeCloudTexture(); disposables.push(cloudTex)
+  const clouds = new THREE.Mesh(
+    new THREE.SphereGeometry(earthR * 1.012, 64, 44),
+    new THREE.MeshStandardMaterial({ map: cloudTex, transparent: true, roughness: 1, metalness: 0, depthWrite: false, fog: false })
   )
-  atmo.position.copy(earth.position); atmo.visible = false; scene.add(atmo)
+  clouds.position.copy(earthPos); clouds.rotation.set(-1.4, 2.6, 0); clouds.visible = false; scene.add(clouds)
+  // 大气辉光：两层背面加色蓝壳，边缘柔和过渡出蓝光
+  const atmoInner = new THREE.Mesh(new THREE.SphereGeometry(earthR * 1.02, 48, 32),
+    new THREE.MeshBasicMaterial({ color: 0x8ec6ff, transparent: true, opacity: 0.38, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))
+  const atmoOuter = new THREE.Mesh(new THREE.SphereGeometry(earthR * 1.05, 48, 32),
+    new THREE.MeshBasicMaterial({ color: 0x4f9be8, transparent: true, opacity: 0.20, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }))
+  atmoInner.position.copy(earthPos); atmoOuter.position.copy(earthPos)
+  atmoInner.visible = atmoOuter.visible = false; scene.add(atmoInner, atmoOuter)
+  const earthMeshes = [earth, clouds, atmoInner, atmoOuter]
 
-  // 切换环境：'space' 在轨（深空 + 弯曲地球）| 其它 恒定金色黄昏天空
+  // 切换环境：'space' 在轨（深空 + 真实地球）| 'sea' 海上（海面+无人船）| 其它 恒定金色黄昏天空
   function setEnvironment(env) {
-    const space = env === 'space'
+    const space = env === 'space', sea = env === 'sea'
     scene.background = space ? spaceTex : skyTex
     if (skyEnvTex && spaceEnvTex) scene.environment = space ? spaceEnvTex : skyEnvTex
-    scene.fog = space ? null : skyFog
-    earth.visible = atmo.visible = space
+    scene.fog = (space || sea) ? null : skyFog
+    for (const m of earthMeshes) m.visible = space
+    ocean.visible = droneship.visible = sea
+    if (sea) { camera.position.set(10, 4.2, 26); camera.lookAt(0, 3.2, 0) }   // 海上回收机位：容得下海面+无人船+下降的一级
   }
 
   // ---- 光照：低垂暖阳 + 暮色半球光 ----
@@ -219,6 +269,26 @@ export function createRocketScene(mount) {
     return t
   }
   const tower = makeTower(); tower.position.set(-3.7, 0, -0.2); scene.add(tower)
+
+  // ---- 海面 + 自动驾驶无人船（海上回收 'sea' 环境；默认隐藏）----
+  const ocean = new THREE.Mesh(
+    new THREE.CircleGeometry(200, 48),
+    new THREE.MeshStandardMaterial({ color: 0x184867, metalness: 0.25, roughness: 0.28, envMapIntensity: 1.4 })
+  )
+  ocean.rotation.x = -Math.PI / 2; ocean.position.y = 0.0; ocean.visible = false; scene.add(ocean)
+  const droneship = new THREE.Group()
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.5, 4.8), new THREE.MeshStandardMaterial({ color: 0x2a2e35, metalness: 0.5, roughness: 0.6 }))
+  deck.position.y = 0.3; droneship.add(deck)
+  // 甲板降落标靶：黑底 + 黄圆环 + 黄 X
+  const bull = new THREE.Mesh(new THREE.CircleGeometry(1.5, 40), new THREE.MeshBasicMaterial({ color: 0x0f1114 }))
+  bull.rotation.x = -Math.PI / 2; bull.position.y = 0.552; droneship.add(bull)
+  const ring2 = new THREE.Mesh(new THREE.RingGeometry(1.18, 1.5, 44), new THREE.MeshBasicMaterial({ color: 0xf0c34a, side: THREE.DoubleSide }))
+  ring2.rotation.x = -Math.PI / 2; ring2.position.y = 0.556; droneship.add(ring2)
+  const xMat = new THREE.MeshBasicMaterial({ color: 0xf0c34a })
+  for (const r of [Math.PI / 4, -Math.PI / 4]) { const b = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.02, 0.16), xMat); b.rotation.y = r; b.position.y = 0.56; droneship.add(b) }
+  // 船舷两侧矮舱室
+  for (const sx of [-3.1, 3.1]) { const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 4.2), new THREE.MeshStandardMaterial({ color: 0x3a3f47, metalness: 0.4, roughness: 0.7 })); h.position.set(sx, 0.55, 0); droneship.add(h) }
+  droneship.position.set(0, 0, 0); droneship.visible = false; scene.add(droneship)
   const chopArms = tower.userData.arms
   const ARM_GRIP = 0.62, ARM_OPEN_EXTRA = 1.25   // 合拢夹持 vs 张开让路的臂间距
   function applyArms(open) {                       // open: 0 合拢夹住 → 1 完全张开
@@ -323,6 +393,21 @@ export function createRocketScene(mount) {
   function setFinsDeploy(f) {   // f: 0 折叠(向上翻贴壁) → 1 完全展开(水平外伸)
     for (const h of gridFins) { h.rotation.z = (1 - f) * (Math.PI * 0.52); h.scale.setScalar(0.72 + 0.28 * f) }
   }
+  // 着陆支腿：一级尾部 4 条，海上无人船回收时展开撑地（陆地筷子夹取用不到，默认收拢）
+  const legs = []
+  for (const a of [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4]) {
+    const az = new THREE.Group(); az.rotation.y = a; az.position.y = 0.85; booster.add(az)
+    const hinge = new THREE.Group(); hinge.position.set(0.6, 0, 0); az.add(hinge)
+    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.9, 10), darkSteel)
+    strut.position.set(0, -0.95, 0); strut.userData.part = 'booster'; hinge.add(strut)
+    const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.07, 12), darkSteel)
+    foot.position.set(0, -1.9, 0); hinge.add(foot)
+    legs.push(hinge)
+  }
+  function setLegsDeploy(f) {   // f: 0 收拢(贴着箭体朝上) → 1 完全展开(向外下方撑开)
+    for (const h of legs) h.rotation.z = 1.75 - f * 2.35   // 收拢≈+100° → 展开≈-35°
+  }
+  setLegsDeploy(0)
   // 再入高温红光：包在一级箭体外的一层可加色发光壳，再入段淡入
   const reentryMat = new THREE.MeshBasicMaterial({ color: 0xff5326, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
   const reentryGlow = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.82, 7.2, 40, 1, true), reentryMat)
@@ -844,6 +929,7 @@ export function createRocketScene(mount) {
     applyArms(armOpen)
     if (sepStep) showStep(sepStep); else hideStep()   // 级间分离步骤提示
 
+    if (clouds.visible) clouds.rotation.y += 0.0003   // 云层缓慢自转
     renderer.render(scene, camera)
   }
   tick()
