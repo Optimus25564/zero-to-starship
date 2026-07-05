@@ -5,6 +5,8 @@ const P = {
 export const level = {
   id: '6.2',
   stage: 'descent',
+  env: 'space',           // 从轨道再入：深空 + 底部弯曲地球
+  recovery: 'reentry',    // 播放二级星舰"按再入角再入"的动画（腹部朝下 + 红热等离子）
   title: { zh: '再入走廊', en: 'The Reentry Corridor' },
   hook: { zh: '阿波罗返回地球时,再入角只有几度的误差空间——太陡会被烧穿,太浅会像打水漂一样被大气弹回太空,再也回不来。', en: 'When Apollo returned to Earth, the reentry angle had only a few degrees of margin—too steep and you burn through, too shallow and you skip off the atmosphere like a stone on water, flung back into space, never to return.' },
   params: [P.reentryAngle],

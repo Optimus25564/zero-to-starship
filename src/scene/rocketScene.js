@@ -293,6 +293,10 @@ export function createRocketScene(mount) {
     n.position.set(Math.cos(a) * 0.3, 0.32, Math.sin(a) * 0.3); ship.add(n)
   }
   const nozC = new THREE.Mesh(nozGeo, darkSteel); nozC.userData.part = 'engine'; nozC.position.set(0, 0.32, 0); ship.add(nozC)
+  // 二级再入等离子红热壳：腹部朝下再入时淡入（安全=橙红；太陡=白热）
+  const shipReentryMat = new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
+  const shipReentry = new THREE.Mesh(new THREE.CylinderGeometry(0.78, 0.66, 6.6, 40, 1, true), shipReentryMat)
+  shipReentry.position.y = 3.4; shipReentry.renderOrder = 4; ship.add(shipReentry)
   rocket.add(ship)
 
   // ---- 一级：超重助推器（Super Heavy）：同径更高、密集发动机环、栅格舵、无襟翼/无腿 ----
@@ -560,7 +564,7 @@ export function createRocketScene(mount) {
   function setPadRise(v) { padRise = !!v }
   function resetRecoveryFx() {   // 复位一级回收动画的临时状态
     rocket.position.x = 0
-    setFinsDeploy(1); reentryMat.opacity = 0
+    setFinsDeploy(1); reentryMat.opacity = 0; shipReentryMat.opacity = 0
   }
 
   function update(next) { state = { ...state, ...next } }
@@ -607,7 +611,14 @@ export function createRocketScene(mount) {
     rocket.rotation.z = 0
     if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
     else if (stage === 'descent') {
-      if (success && vehicle === 'booster' && recoveryStyle === 'full') {
+      if (recoveryStyle === 'reentry') {
+        // 二级星舰再入：在轨高空、深空+地球，腹部朝下按再入角切入（不显示发射场）
+        ground.visible = pad.visible = tower.visible = false
+        camera.position.set(2, 6, 27); camera.lookAt(0, 4.5, 0)   // 拉远：容得下横躺的星舰 + 斜切轨迹
+        rocketY = 7; rocket.position.x = -3.5; rocket.rotation.z = 1.15   // 从左上方、腹部朝下切入
+        shipReentryMat.opacity = 0
+        anim = { type: 'reenter', t: 0 }
+      } else if (success && vehicle === 'booster' && recoveryStyle === 'full') {
         // 一级回收全流程：刚分离，在远离发射场的【高空】——掉头/展舵/再入都看不到塔架，
         // 先把整个发射场藏起来，等最后一步"着陆点火"再露出塔架、被筷子夹住。
         ground.visible = pad.visible = tower.visible = false
@@ -705,6 +716,33 @@ export function createRocketScene(mount) {
         rocket.rotation.z += (tgtRot - rocket.rotation.z) * 0.03
         setFinsDeploy(fins); reentryMat.opacity = glow
         flameThrust = burn; bright = true
+      } else if (anim.type === 'reenter') {
+        // 二级星舰再入：腹部朝下，按【再入角】从左上方切入。角度决定坡度与结局：
+        //   安全走廊(4~7°)：稳稳穿过，橙红等离子；太浅(<4°)：打水漂被弹回；太陡(>7°)：白热过热烧毁
+        const rt = anim.t
+        const ang = state.reentryAngle || 5
+        const slope = Math.tan(ang * Math.PI / 180) * 3.2   // 放大坡度以看清"角度"
+        const vx = 0.85                                      // 水平匀速推进
+        rocket.rotation.z += (1.15 - rocket.rotation.z) * 0.05   // 腹部朝下的再入姿态
+        let px = -3.5 + rt * vx, py, gl, hex = 0xff5a2a
+        if (state.reentrySteep) {                            // 太陡：急坠 + 白热 + 抖动 → 烧毁
+          py = 7 - rt * vx * slope
+          gl = Math.min(1.0, rt / 1.4); hex = rt > 1.6 ? 0xffffff : 0xff5a2a
+          px += Math.sin(rt * 42) * 0.05 * Math.min(1, rt)
+          sepStep = t({ zh: `再入角 ${ang}° · 太陡：过热烧毁 🔥`, en: `Reentry ${ang}° · too steep: burning up 🔥` })
+        } else if (state.reentryShallow) {                   // 太浅：切入后被大气弹回（打水漂）
+          const dn = Math.min(rt, 3), up = Math.max(0, rt - 3)
+          py = 7 - dn * vx * slope + up * up * 0.35
+          gl = Math.max(0, 0.42 - Math.abs(rt - 2.2) * 0.16)
+          sepStep = t({ zh: `再入角 ${ang}° · 太浅：打水漂被弹回 🪨`, en: `Reentry ${ang}° · too shallow: skips off 🪨` })
+        } else {                                             // 安全走廊：稳稳下滑穿过
+          py = 7 - rt * vx * slope
+          gl = Math.min(0.62, rt / 1.5) * (rt > 6 ? Math.max(0, 1 - (rt - 6) / 2) : 1)
+          sepStep = t({ zh: `再入角 ${ang}° · 安全走廊，稳稳穿过 ✅`, en: `Reentry ${ang}° · safe corridor ✅` })
+        }
+        rocket.position.x = px; rocketY = py
+        shipReentryMat.color.setHex(hex); shipReentryMat.opacity = gl
+        flameThrust = 0; bright = true
       } else if (anim.type === 'launch') {
         anim.vy = Math.min(anim.vy + 0.00035, 0.036) // 缓缓离地、越升越快，约 6 秒爬出画面
         rocketY += anim.vy
