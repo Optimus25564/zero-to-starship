@@ -271,17 +271,19 @@ export function createRocketScene(mount) {
   const bBand = new THREE.Mesh(new THREE.CylinderGeometry(0.606, 0.606, 0.14, 72), darkSteel); bBand.position.y = 5.4
   bInter.userData.part = bSkirt.userData.part = bBand.userData.part = 'booster'  // 整根一级可悬停看剖面
   booster.add(bBody, bInter, bSkirt, bBand)
-  // 栅格舵：顶部 4 片，径向外伸（收集引用，供回收动画里"展开"用）
-  const gridGeo = new THREE.BoxGeometry(0.34, 0.46, 0.05)
+  // 栅格舵：顶部 4 片，铰接在箭体上。上升/收拢时向上翻折贴着箭体；回收再入前展开成水平外伸。
+  // 用亮钛色 + 明显的"翻出来"动作，方便在回收动画里一眼看到它展开。
+  const titanium = new THREE.MeshStandardMaterial({ color: 0xb2bac4, metalness: 0.72, roughness: 0.34 })
+  const finGeo = new THREE.BoxGeometry(0.52, 0.66, 0.08)
   const gridFins = []
   for (const a of [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4]) {
-    const g = new THREE.Mesh(gridGeo, darkSteel)
-    g.position.set(Math.cos(a) * 0.74, 7.15, Math.sin(a) * 0.74)
-    g.rotation.y = -a
-    booster.add(g); gridFins.push(g)
+    const az = new THREE.Group(); az.rotation.y = -a; az.position.y = 7.1; booster.add(az)   // 方位
+    const hinge = new THREE.Group(); hinge.position.set(0.58, 0, 0); az.add(hinge)            // 铰链贴在箭体表面
+    const fin = new THREE.Mesh(finGeo, titanium); fin.position.set(0.3, 0, 0); fin.userData.part = 'booster'
+    hinge.add(fin); gridFins.push(hinge)
   }
-  function setFinsDeploy(f) {   // f: 0 收拢 → 1 完全展开
-    for (const g of gridFins) g.scale.set(0.25 + 0.75 * f, 1, 0.25 + 0.75 * f)
+  function setFinsDeploy(f) {   // f: 0 折叠(向上翻贴壁) → 1 完全展开(水平外伸)
+    for (const h of gridFins) { h.rotation.z = (1 - f) * (Math.PI * 0.52); h.scale.setScalar(0.72 + 0.28 * f) }
   }
   // 再入高温红光：包在一级箭体外的一层可加色发光壳，再入段淡入
   const reentryMat = new THREE.MeshBasicMaterial({ color: 0xff5326, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
@@ -571,13 +573,17 @@ export function createRocketScene(mount) {
     rocket.rotation.z = 0
     if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
     else if (stage === 'descent') {
-      ground.visible = pad.visible = tower.visible = true   // 回收：完整发射场(地面+台座+塔+筷子)出现，和起飞时一样
       if (success && vehicle === 'booster' && recoveryStyle === 'full') {
-        // 一级回收全流程：刚分离，高空、发动机朝下（rot.z=0）、栅格舵还收着
-        rocketY = 14; rocket.position.x = 3.4; rocket.rotation.z = 0
+        // 一级回收全流程：刚分离，在远离发射场的【高空】——掉头/展舵/再入都看不到塔架，
+        // 先把整个发射场藏起来，等最后一步"着陆点火"再露出塔架、被筷子夹住。
+        ground.visible = pad.visible = tower.visible = false
+        rocketY = 15; rocket.position.x = 3.6; rocket.rotation.z = 0
         setFinsDeploy(0); reentryMat.opacity = 0
         anim = { type: 'recover', t: 0 }
-      } else { rocketY = 12; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 } }
+      } else {
+        ground.visible = pad.visible = tower.visible = true   // 简单着陆：直接看到完整发射场
+        rocketY = 12; anim = { type: success ? 'land-ok' : 'land-fail', t: 0 }
+      }
     }
     else if (stage === 'separate') {   // 级间分离关：时序对才分离，错则只补一段推力不分离
       sepGap = 0; boosterDrop = 0; booster.position.y = 0; booster.rotation.z = 0; positionShip()
@@ -630,35 +636,39 @@ export function createRocketScene(mount) {
         }
         bright = true
       } else if (anim.type === 'recover') {
-        // 一级回收全流程（分离之后，三次点火）：
-        //   ① 掉头·回推点火 → ② 展开栅格舵·立直 → ③ 再入点火·减速 → ④ 着陆点火·被筷子夹住
-        // 要点：尾焰(发动机)始终在【下方】；掉头后转成【竖直、发动机朝下】，冲着塔架笔直落下被夹住。
+        // 一级回收全流程（分离之后，三次点火）——放慢，每步约 5 秒，看清每个动作：
+        //   ① 掉头·回推点火（高空，远离发射场，看不到塔架）
+        //   ② 展开栅格舵·立直（栅格舵徐徐翻出，仍在高空）
+        //   ③ 再入点火·减速（笔直下坠 + 高温红光，还看不到塔架）
+        //   ④ 着陆点火·被筷子夹住（这一步才露出发射场，冲着筷子落下被夹住）
+        // 要点：尾焰(发动机)始终在【下方】；掉头后一路【竖直、发动机朝下】笔直落向筷子。
         const rt = anim.t   // 注意：别用变量名 t，会遮蔽 i18n 的 t()
-        let tgtY, tgtX, tgtRot, burn = 0, glow = 0, fins
-        if (rt < 3.0) {                   // ① 掉头 · 回推点火（高空，远离塔架）
-          sepStep = t({ zh: '① 掉头 · 回推点火', en: '① Flip around · boostback burn' })
-          tgtY = 14; tgtX = 1.2; tgtRot = 1.55            // 翻成横向：发动机指向弹道前方
-          burn = (rt > 0.7 && rt < 2.4) ? 900000 : 0      // 先转头，再点火把弹道推回发射场
+        let tgtY, tgtX, tgtRot, burn = 0, glow = 0, fins, showSite = false
+        if (rt < 5.0) {                   // ① 掉头 · 回推点火（高空，无塔架）
+          sepStep = t({ zh: '① 掉头 · 回推点火（高空）', en: '① Flip around · boostback burn (high up)' })
+          tgtY = 15; tgtX = 2.6; tgtRot = 1.55            // 翻成横向：发动机指向弹道前方
+          burn = (rt > 1.8 && rt < 4.4) ? 900000 : 0      // 先慢慢转头，再点火把弹道推回发射场
           fins = 0                                        // 栅格舵仍收着
-        } else if (rt < 5.6) {            // ② 展开栅格舵 · 立直（发动机朝下、对准塔架）
-          sepStep = t({ zh: '② 展开栅格舵 · 立直', en: '② Deploy grid fins · upright' })
-          tgtY = 11.5; tgtX = 0; tgtRot = 0               // 转回竖直、发动机朝下、移到塔架正上方
-          fins = Math.min(1, (rt - 3.0) / 1.8)            // 栅格舵在再入前徐徐展开
-        } else if (rt < 8.6) {            // ③ 再入点火 · 减速（笔直下坠，高温红光）
+        } else if (rt < 10.0) {           // ② 展开栅格舵 · 立直（高空，无塔架）
+          sepStep = t({ zh: '② 展开栅格舵 · 立直（高空）', en: '② Deploy grid fins · upright (high up)' })
+          tgtY = 14; tgtX = 1.0; tgtRot = 0               // 转回竖直、发动机朝下
+          fins = Math.min(1, (rt - 5.2) / 4.2)            // 栅格舵在再入前【慢慢翻出来】
+        } else if (rt < 15.0) {           // ③ 再入点火 · 减速（高空下坠，无塔架）
           sepStep = t({ zh: '③ 再入点火 · 减速', en: '③ Reentry burn · slow down' })
-          tgtY = 5.5; tgtX = 0; tgtRot = 0
-          burn = (rt > 5.8 && rt < 7.8) ? 560000 : 0
-          glow = rt < 7.6 ? Math.min(0.6, (rt - 5.6) / 1.0) : Math.max(0, 0.6 - (rt - 7.6) * 1.4)
+          tgtY = 7; tgtX = 0.2; tgtRot = 0                // 笔直下坠
+          burn = (rt > 10.6 && rt < 14.2) ? 560000 : 0
+          glow = rt < 13.6 ? Math.min(0.6, (rt - 10.0) / 1.6) : Math.max(0, 0.6 - (rt - 13.6) * 1.1)
           fins = 1
-        } else {                          // ④ 着陆点火 · 被筷子夹住（竖直、发动机朝下）
+        } else {                          // ④ 着陆点火 · 被筷子夹住（露出发射场）
           sepStep = t({ zh: '④ 着陆点火 · 筷子夹住', en: '④ Landing burn · caught by the arms' })
           tgtY = 3; tgtX = 0; tgtRot = 0
-          burn = rocketY > 3.15 ? 480000 : 0
-          fins = 1
+          burn = rocketY > 3.15 ? 500000 : 0
+          fins = 1; showSite = true                       // 这一步才把发射场（地面+塔架+筷子）显示出来
         }
-        rocketY += (tgtY - rocketY) * 0.05
-        rocket.position.x += (tgtX - rocket.position.x) * 0.06
-        rocket.rotation.z += (tgtRot - rocket.rotation.z) * 0.06
+        if (showSite) ground.visible = pad.visible = tower.visible = true
+        rocketY += (tgtY - rocketY) * 0.025    // 放慢下降
+        rocket.position.x += (tgtX - rocket.position.x) * 0.03
+        rocket.rotation.z += (tgtRot - rocket.rotation.z) * 0.03
         setFinsDeploy(fins); reentryMat.opacity = glow
         flameThrust = burn; bright = true
       } else if (anim.type === 'launch') {

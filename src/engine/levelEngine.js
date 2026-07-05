@@ -87,7 +87,7 @@ export function startGame(mount) {
       progression.complete(current.id, stars)
       const m = MILESTONES[current.milestoneId]
       // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-      const delay = current.recovery === 'full' ? 10000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
+      const delay = current.recovery === 'full' ? 19000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
       clearTimeout(milestoneTimer)
       milestoneTimer = setTimeout(() => hud.showMilestone({ title: t(m.title), fact: t(m.fact), stars }), delay)
     }
