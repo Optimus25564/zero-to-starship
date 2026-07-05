@@ -1,4 +1,5 @@
 import { create3DDiagram } from './diagram3d.js'
+import { t } from '../i18n.js'
 
 // 剖面构造面板：鼠标悬停到 3D 火箭上时，从右侧滑出当前关卡的剖面构造
 // （2D SVG 或可旋转 3D 模型）；移开火箭与面板后自动收起。
@@ -6,12 +7,13 @@ export function createDiagramPanel(mount) {
   const root = document.createElement('div')
   root.className = 'diagram-root'
   root.innerHTML = `
-    <div class="diagram-hint hidden">🔧 把鼠标移到火箭上，看内部构造</div>
+    <div class="diagram-hint hidden"></div>
     <div class="diagram-panel hidden">
       <div class="diagram-title"></div>
       <div class="diagram-body"></div>
     </div>`
   mount.appendChild(root)
+  root.querySelector('.diagram-hint').textContent = t({ zh: '🔧 把鼠标移到火箭上，看内部构造', en: '🔧 Hover the rocket to see inside' })
 
   const hint = root.querySelector('.diagram-hint')
   const panel = root.querySelector('.diagram-panel')
@@ -55,10 +57,11 @@ export function createDiagramPanel(mount) {
       hide()
       current = diagram && (diagram.svg || diagram.model3d) ? diagram : null
       if (current) {
-        titleEl.textContent = current.title || '剖面构造'
+        titleEl.textContent = t(current.title) || t({ zh: '剖面构造', en: 'Cutaway' })
+        const legend = t(current.legend)
         body.innerHTML = current.model3d
-          ? `<div class="d3d-wrap"></div>${current.legend ? `<div class="d3d-legend">${current.legend}</div>` : ''}`
-          : current.svg
+          ? `<div class="d3d-wrap"></div>${legend ? `<div class="d3d-legend">${legend}</div>` : ''}`
+          : t(current.svg)
         hint.classList.remove('hidden')
       } else {
         hint.classList.add('hidden')
