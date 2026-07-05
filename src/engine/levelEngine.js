@@ -113,8 +113,8 @@ export function startGame(mount) {
     scene.setRecovery(level.recovery || 'simple')
     scene.setPadRise(!!level.padRise)
     scene.setHighlight(level.highlight || null)
-    // 侧边图面板只保留"没法画在火箭上的化学流程"（火星 Sabatier / 8.1）；其余信息就地标在主火箭上
-    diagramPanel.setDiagram(level.id === '8.1' ? level.diagram : null)
+    // 侧边图面板只保留"没法画在火箭上的复杂流程"：火星 Sabatier(8.1) + 发动机全流量循环(2.3)；其余就地标在主火箭
+    diagramPanel.setDiagram((level.id === '8.1' || level.id === '2.3') ? level.diagram : null)
 
     if (interactionMod) interactionMod.destroy()
     if (level.interaction === 'choice') {

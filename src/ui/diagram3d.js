@@ -92,8 +92,10 @@ export function create3DDiagram(container, kind) {
     addFlow([[1.15, 2.7, 0], [1.15, 1.9, 0], [1.15, 1.2, 0], [0.7, 1.7, 0], [0.2, 1.85, 0]], 0x5aa8ff, { count: 8, speed: 0.17, r: 0.06 })
     addCombustion(1.6, 0.42)                                                    // 主燃烧室二次燃烧
     addFlow([[0, 1.7, 0], [0, 1.2, 0], [0, 0.98, 0], [0, 0.4, 0], [0, -1.3, 0]], 0xffcf6a, { count: 14, speed: 0.5, r: 0.06, tube: false, spread: 0.62 })
-    makeLabel(t({ zh: '富燃预燃室·涡轮泵', en: 'Fuel-rich preburner + pump' }), [-1.15, 2.5, 0], '#ffc48a', 18)
-    makeLabel(t({ zh: '富氧预燃室·涡轮泵', en: 'Ox-rich preburner + pump' }), [1.15, 2.5, 0], '#a8d8ff', 18)
+    makeLabel(t({ zh: '富燃预燃室 → 甲烷泵', en: 'Fuel-rich PB → methane pump' }), [-1.15, 2.55, 0], '#ffc48a', 17)
+    makeLabel(t({ zh: '富氧预燃室 → 液氧泵', en: 'Ox-rich PB → LOX pump' }), [1.15, 2.55, 0], '#a8d8ff', 17)
+    makeLabel(t({ zh: '涡轮泵', en: 'turbopump' }), [-1.15, 1.0, 0], '#e8d0b0', 15)
+    makeLabel(t({ zh: '涡轮泵', en: 'turbopump' }), [1.15, 1.0, 0], '#bcd6f0', 15)
     makeLabel(t({ zh: '主燃烧室', en: 'Main chamber' }), [0, 2.34, 0], '#ffe0a8', 22)
     group.position.y = -0.55
   } else {
