@@ -16,7 +16,7 @@ export const level = {
   vehicle: 'stack',
   title: { zh: '级间分离时序', en: 'Stage Separation Timing' },
   interaction: 'sequence',
-  hook: { zh: '星舰玩的是"热分离"：一级还没松开，二级就在它头顶点火，靠喷流把一级顶开——省掉了传统火箭"先分离再点火"之间那段危险的失重滑行。但顺序必须严丝合缝：一级没先降推力就点火会顶爆，环不抛一级带着死重飞不回来。', en: 'Starship uses "hot-staging": before the booster lets go, the upper stage ignites right on top of it, using its exhaust to push the booster away — skipping the dangerous weightless coast between "separate then ignite" on traditional rockets. But the order must be exact: igniting before the booster throttles down would blow the top off, and failing to jettison the ring leaves the booster carrying dead weight it can\'t fly home with.' },
+  hook: { zh: '上升段最惊险的几秒——级间分离。动作早一步会顶爆、晚一步会烧穿，"级间环"不抛一级就飞不回来。按星舰"热分离"的飞行手册，把这几步排成正确时序。', en: 'The most nerve-wracking seconds of ascent — staging. A step too early and it blows up, too late and it burns through, and if the "hot-stage ring" isn\'t dropped the booster can\'t fly home. Order these steps per Starship\'s hot-staging flight manual.' },
   steps: STEPS,
   compute: (p) => ({ correct: eq(p.order || [], CORRECT), done: (p.order || []).length === CORRECT.length }),
   goal: { text: { zh: '按星舰"热分离"排出正确时序', en: 'Arrange the correct sequence for Starship\'s "hot-staging"' }, check: (d) => d.correct },
