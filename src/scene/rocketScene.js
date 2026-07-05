@@ -503,8 +503,10 @@ export function createRocketScene(mount) {
     resetRecoveryFx()                              // 复位一级回收动画状态
     armOpen = stage === 'descent' ? 1 : 0; applyArms(armOpen)  // 回收关臂张开候着；其余合拢
     const airborne = stage === 'ascent' || stage === 'separate'
-    ground.visible = pad.visible = tower.visible = !airborne  // 飞行中收起地面/发射塔
-    rocketY = stage === 'descent' ? 12 : airborne ? 2.4 : 0   // 下降关：从高空回来
+    const landing = stage === 'descent'                        // 回收关：一级在空中朝塔架降落
+    ground.visible = pad.visible = !airborne && !landing       // 起飞才有地面/发射台座；上升/回收都收起
+    tower.visible = !airborne                                  // 塔架保留（回收要用筷子夹）
+    rocketY = landing ? 12 : airborne ? 2.4 : 0                // 下降关：从高空回来
     rocket.position.y = rocketY
   }
 
