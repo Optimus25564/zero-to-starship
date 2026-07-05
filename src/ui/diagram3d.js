@@ -77,9 +77,86 @@ export function create3DDiagram(container, kind) {
   }
 
   let engineFx = null
+  let extraTick = null      // 某些示意图自带的额外动画（如栅格舵摆动）
   let spin = true
 
-  if (kind === 'engine-cycle') {
+  if (kind === 'gridfin') {
+    // 栅格舵：华夫饼式镂空格栅，铰接在助推器上部、径向伸出，高速气流穿过，转动即操舵
+    spin = false
+    camera.position.set(2.3, 0.8, 4.7); camera.lookAt(0.2, 0.1, 0)
+    const body = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.55, 0.55, 3.0, 40, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0xb4bcc6, metalness: 0.82, roughness: 0.34, side: THREE.DoubleSide })
+    )
+    group.add(body)
+    const fin = new THREE.Group()
+    fin.position.set(0.55, 1.0, 0)   // 贴在箭体上部侧壁，铰链沿径向(x)
+    group.add(fin)
+    const slatMat = new THREE.MeshStandardMaterial({ color: 0xd7dde4, metalness: 0.85, roughness: 0.28 })
+    const FW = 1.25, FH = 1.0, FT = 0.18   // 径向宽 / 轴向高 / 厚
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(FW, FH, FT),
+      new THREE.MeshStandardMaterial({ color: 0xd7dde4, metalness: 0.85, roughness: 0.28, transparent: true, opacity: 0.14, depthWrite: false })
+    )
+    frame.position.x = FW / 2; fin.add(frame)
+    const NX = 6, NY = 5   // 纵横薄片交织成华夫饼格栅
+    for (let i = 0; i <= NX; i++) {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(0.035, FH, FT), slatMat)
+      s.position.set((i / NX) * FW, 0, 0); fin.add(s)
+    }
+    for (let j = 0; j <= NY; j++) {
+      const s = new THREE.Mesh(new THREE.BoxGeometry(FW, 0.035, FT), slatMat)
+      s.position.set(FW / 2, -FH / 2 + (j / NY) * FH, 0); fin.add(s)
+    }
+    // 高速气流从下往上穿过格栅（一级尾朝下坠落 → 相对风自下而来）；几股平行流
+    for (const dx of [-0.05, 0.35, 0.72, 1.05]) {
+      addFlow([[dx, -1.7, 0], [dx * 0.9 + 0.2, -0.5, 0], [dx * 0.85 + 0.35, 1.0, 0], [dx * 0.8 + 0.4, 2.1, 0]],
+        0x8fd8ff, { count: 6, speed: 0.3, r: 0.045, tube: false })
+    }
+    makeLabel(t({ zh: '栅格舵', en: 'Grid fin' }), [1.2, 1.85, 0], '#eaf4ff', 22)
+    makeLabel(t({ zh: '钛合金格栅', en: 'Titanium lattice' }), [1.15, -1.15, 0], '#bcd6f0', 16)
+    makeLabel(t({ zh: '↑ 气流', en: '↑ airflow' }), [-0.1, -1.9, 0], '#9fd8ff', 15)
+    extraTick = (fr) => { fin.rotation.x = Math.sin(fr * 0.02) * 0.5 }   // 绕径向铰链摆动 → 偏转气流操舵
+    group.position.y = -0.1
+  } else if (kind === 'autogenous') {
+    // 自生增压：抽出液体→发动机余热汽化→打回自己贮箱顶部气枕，维持箱压
+    spin = false
+    camera.position.set(0.3, 0.4, 6.4); camera.lookAt(0, 0.0, 0)
+    const wallMat = (c) => new THREE.MeshStandardMaterial({ color: c, metalness: 0.4, roughness: 0.4, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false })
+    const liqMat = (c) => new THREE.MeshStandardMaterial({ color: c, metalness: 0.2, roughness: 0.6, transparent: true, opacity: 0.82 })
+    const H = 2.6, R = 0.62
+    function makeTank(x, wallColor, liqColor, level) {
+      const T = new THREE.Group(); T.position.x = x; group.add(T)
+      T.add(new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 32, 1, true), wallMat(wallColor)))
+      const dome = new THREE.SphereGeometry(R, 28, 14, 0, Math.PI * 2, 0, Math.PI / 2)
+      const cap1 = new THREE.Mesh(dome, wallMat(wallColor)); cap1.position.y = H / 2; T.add(cap1)
+      const cap2 = new THREE.Mesh(dome, wallMat(wallColor)); cap2.position.y = -H / 2; cap2.rotation.x = Math.PI; T.add(cap2)
+      const lh = H * level
+      const liq = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.95, R * 0.95, lh, 32), liqMat(liqColor))
+      liq.position.y = -H / 2 + lh / 2; T.add(liq)
+      return T
+    }
+    makeTank(-1.2, 0xff9a3a, 0xffb968, 0.5)
+    makeTank(1.2, 0x5aa8ff, 0x8fd0ff, 0.62)
+    // 发动机（底部中央，产生余热）
+    const eng = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.34, 0.5, 0.7, 24, 1, true),
+      new THREE.MeshStandardMaterial({ color: 0x9aa2ab, metalness: 0.8, roughness: 0.4, side: THREE.DoubleSide })
+    )
+    eng.position.set(0, -2.15, 0); group.add(eng)
+    addCombustion(-2.15, 0.3)   // 发动机余热
+    // 甲烷回路：箱底抽液↓ → 发动机 → 汽化气体↑打回箱顶
+    addFlow([[-1.2, -1.0, 0], [-1.2, -1.7, 0], [-0.35, -2.05, 0]], 0xffb968, { count: 5, speed: 0.22, r: 0.05 })
+    addFlow([[-0.35, -2.0, 0], [-1.85, -1.4, 0], [-1.95, 0.6, 0], [-1.2, 1.15, 0]], 0xffe4bc, { count: 8, speed: 0.32, r: 0.05 })
+    // 液氧回路
+    addFlow([[1.2, -1.0, 0], [1.2, -1.7, 0], [0.35, -2.05, 0]], 0x8fd0ff, { count: 5, speed: 0.22, r: 0.05 })
+    addFlow([[0.35, -2.0, 0], [1.85, -1.4, 0], [1.95, 0.7, 0], [1.2, 1.25, 0]], 0xd6ecff, { count: 8, speed: 0.32, r: 0.05 })
+    makeLabel(t({ zh: '甲烷箱', en: 'Methane' }), [-1.2, 1.75, 0], '#ffc48a', 18)
+    makeLabel(t({ zh: '液氧箱', en: 'LOX' }), [1.2, 1.75, 0], '#a8d8ff', 18)
+    makeLabel(t({ zh: '气枕', en: 'Ullage' }), [0, 1.15, 0], '#dfe8f2', 15)
+    makeLabel(t({ zh: '发动机汽化', en: 'Engine vaporizes' }), [0, -2.75, 0], '#ffd070', 16)
+    group.position.y = 0.35
+  } else if (kind === 'engine-cycle') {
     spin = false
     camera.position.set(0.15, 0.7, 5.7); camera.lookAt(0, 0.35, 0)
     group.add(makeWall())
@@ -140,6 +217,7 @@ export function create3DDiagram(container, kind) {
     requestAnimationFrame(tick)
     f += 1
     group.rotation.y = spin ? group.rotation.y + 0.009 : Math.sin(f * 0.006) * 0.45  // 前向轻摇，露出内部
+    if (extraTick) extraTick(f)
     updateFlows()
     for (const g of glows) g.material.opacity = 0.42 + 0.22 * Math.sin(f * 0.25 + g.position.y * 3)  // 燃烧闪动
     if (engineFx) {

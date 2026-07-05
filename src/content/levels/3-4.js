@@ -20,48 +20,12 @@ export const level = {
       ? `Pressure P = ${p.tankPressure.toFixed(1)} bar · ${d.tooLow ? 'Too low: pumps cavitate, thin walls collapse⚠️' : d.tooHigh ? 'Overpressure: tank may rupture⚠️' : 'Safe zone, pump inlet flow normal✅'}`
       : `压力 P = ${p.tankPressure.toFixed(1)} bar · ${d.tooLow ? '偏低：泵吸空、薄壁塌陷⚠️' : d.tooHigh ? '超压：罐体可能破裂⚠️' : '安全区，泵进气正常✅'}`,
   diagram: {
-    title: { zh: '贮箱增压 · 自生增压', en: 'Tank Pressurization · Autogenous Pressurization' },
-    svg: { zh: `<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
-      <defs><marker id="a34" markerWidth="9" markerHeight="9" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9fd0ff"/></marker></defs>
-      <g transform="translate(210,0)">
-        <rect x="-70" y="60" width="140" height="280" rx="26" fill="#182238" stroke="#8b939c" stroke-width="2"/>
-        <rect x="-66" y="200" width="132" height="136" rx="14" fill="#d99a44"/>
-        <text x="0" y="130" fill="#bcd0e6" font-size="13" text-anchor="middle">增压气体</text>
-        <text x="0" y="150" fill="#8ba0b4" font-size="11" text-anchor="middle">（顶部气枕）</text>
-        <text x="0" y="272" fill="#3a2a10" font-size="13" text-anchor="middle">液态推进剂</text>
-        <path d="M40,344 C 120,344 120,120 74,110" fill="none" stroke="#7fd0a0" stroke-width="3" marker-end="url(#a34)"/>
-        <line x1="0" y1="340" x2="0" y2="366" stroke="#ffb25a" stroke-width="3" marker-end="url(#a34)"/>
-      </g>
-      <g font-size="13" fill="#e6ebf2">
-        <line x1="300" y1="230" x2="392" y2="230" stroke="#7fd0a0"/><text x="396" y="226">自生增压管路</text>
-        <text x="396" y="244" font-size="11" fill="#8ba0b4">从发动机引气化气体回来打气</text>
-        <text x="188" y="384" fill="#ffb25a" font-size="12">↓ 通向涡轮泵 / 发动机</text>
-      </g>
-      <text x="20" y="150" fill="#9fd0ff" font-size="12">压力太低：</text>
-      <text x="20" y="168" fill="#8ba0b4" font-size="11">泵吸空、薄壁塌陷</text>
-      <text x="20" y="200" fill="#9fd0ff" font-size="12">压力太高：</text>
-      <text x="20" y="218" fill="#8ba0b4" font-size="11">罐体破裂</text>
-    </svg>`, en: `<svg viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
-      <defs><marker id="a34" markerWidth="9" markerHeight="9" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#9fd0ff"/></marker></defs>
-      <g transform="translate(210,0)">
-        <rect x="-70" y="60" width="140" height="280" rx="26" fill="#182238" stroke="#8b939c" stroke-width="2"/>
-        <rect x="-66" y="200" width="132" height="136" rx="14" fill="#d99a44"/>
-        <text x="0" y="130" fill="#bcd0e6" font-size="13" text-anchor="middle">Pressurant gas</text>
-        <text x="0" y="150" fill="#8ba0b4" font-size="11" text-anchor="middle">(top ullage)</text>
-        <text x="0" y="272" fill="#3a2a10" font-size="13" text-anchor="middle">Liquid propellant</text>
-        <path d="M40,344 C 120,344 120,120 74,110" fill="none" stroke="#7fd0a0" stroke-width="3" marker-end="url(#a34)"/>
-        <line x1="0" y1="340" x2="0" y2="366" stroke="#ffb25a" stroke-width="3" marker-end="url(#a34)"/>
-      </g>
-      <g font-size="13" fill="#e6ebf2">
-        <line x1="300" y1="230" x2="392" y2="230" stroke="#7fd0a0"/><text x="396" y="226">Autogenous pressurization line</text>
-        <text x="396" y="244" font-size="11" fill="#8ba0b4">Vaporized gas tapped from the engine, fed back to pressurize</text>
-        <text x="188" y="384" fill="#ffb25a" font-size="12">↓ To turbopumps / engines</text>
-      </g>
-      <text x="20" y="150" fill="#9fd0ff" font-size="12">Pressure too low:</text>
-      <text x="20" y="168" fill="#8ba0b4" font-size="11">pumps cavitate, thin walls collapse</text>
-      <text x="20" y="200" fill="#9fd0ff" font-size="12">Pressure too high:</text>
-      <text x="20" y="218" fill="#8ba0b4" font-size="11">tank ruptures</text>
-    </svg>` },
+    title: { zh: '自生增压 · 贮箱自己给自己打气', en: 'Autogenous Pressurization · the tank pumps itself up' },
+    model3d: 'autogenous',
+    legend: {
+      zh: '<b>自生增压</b>：从贮箱底部抽出少量<b>液氧 / 液甲烷</b>（细流↓）→ 流经<b>发动机</b>被余热<b>汽化</b>成高压气体 → 打回<b>自己贮箱顶部的气枕</b>（浅色流↑），把箱压顶在安全区。<br>不用额外背一整套<b>氦气瓶</b>，省重量、也省一套独立增压系统。压力太低泵会吸空、薄壁塌陷；太高罐体破裂。',
+      en: '<b>Autogenous pressurization</b>: a small amount of <b>liquid oxygen / methane</b> is drawn from the bottom of each tank (thin flow ↓) → passes through the <b>engine</b> where waste heat <b>vaporizes</b> it into high-pressure gas → fed back into <b>the ullage at the top of its own tank</b> (pale flow ↑), holding tank pressure in the safe zone.<br>No need to carry a whole set of <b>helium bottles</b> — saving weight and an entire separate pressurization system. Too little pressure and the pumps cavitate and thin walls buckle; too much and the tank ruptures.',
+    },
   },
   milestoneId: 'autogenous-pressurization',
 }

@@ -129,8 +129,10 @@ export function startGame(mount) {
     scene.setPadRise(!!level.padRise)
     scene.setEnvironment(level.env || 'sky')   // 入轨关切成太空背景（底部地球）
     scene.setHighlight(level.highlight || null)
-    // 侧边图面板只保留"没法画在火箭上的复杂流程"：火星 Sabatier(8.1) + 发动机全流量循环(2.3)；其余就地标在主火箭
-    diagramPanel.setDiagram((level.id === '8.1' || level.id === '2.3') ? level.diagram : null)
+    // 侧边图面板只保留"没法画在火箭上的复杂流程"：火星 Sabatier(8.1)、发动机全流量循环(2.3)、
+    // 栅格舵(6.1)、自生增压(3.4)；其余就地标在主火箭
+    const PANEL_LEVELS = new Set(['8.1', '2.3', '6.1', '3.4'])
+    diagramPanel.setDiagram(PANEL_LEVELS.has(level.id) ? level.diagram : null)
 
     if (interactionMod) interactionMod.destroy()
     if (level.interaction === 'choice') {
