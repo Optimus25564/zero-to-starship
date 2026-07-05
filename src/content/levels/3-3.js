@@ -8,6 +8,7 @@ const MATERIALS = [
 
 export const level = {
   id: '3.3',
+  env: 'space',   // 二级已入轨：太空背景（底部地球）
   stage: 'ascent',   // 已分离，二级在空中（不在发射架上）
   title: { zh: '钢还是铝', en: 'Steel or Aluminum' },
   interaction: 'choice',

@@ -25,7 +25,8 @@ export function createRocketScene(mount) {
   function hideStep() { stepLabel.style.opacity = '0' }
 
   const scene = new THREE.Scene()
-  scene.fog = new THREE.Fog(new THREE.Color(0xcf9a5e), 60, 380)
+  const skyFog = new THREE.Fog(new THREE.Color(0xcf9a5e), 60, 380)
+  scene.fog = skyFog
 
   // 低角度英雄镜头，仰视火箭
   const camera = new THREE.PerspectiveCamera(43, W / H, 0.1, 3000)
@@ -63,15 +64,58 @@ export function createRocketScene(mount) {
     tex.mapping = THREE.EquirectangularReflectionMapping
     return tex
   }
-  const skyTex = makeSkyTexture()
-  disposables.push(skyTex)
+  // ---- 太空 / 在轨背景（深空 + 底部地球 + 大气辉光）----
+  function makeSpaceTexture() {
+    const cw = 1024, ch = 512
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch
+    const ctx = c.getContext('2d')
+    const g = ctx.createLinearGradient(0, 0, 0, ch)
+    g.addColorStop(0.00, '#04060e') // 天顶深空
+    g.addColorStop(0.40, '#070b18')
+    g.addColorStop(0.47, '#0a1a3a') // 接近地球（英雄机位下沿约在此）
+    g.addColorStop(0.51, '#3f86e0') // 大气辉光带
+    g.addColorStop(0.545, '#a6cbf4')
+    g.addColorStop(0.60, '#3d78c4')
+    g.addColorStop(0.80, '#1d4d8c') // 地球海洋
+    g.addColorStop(1.00, '#0f3568')
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch)
+    for (let i = 0; i < 620; i++) {   // 星星（只在上部深空）
+      const y = Math.random() * ch * 0.42, x = Math.random() * cw, r = Math.random() * 1.3
+      ctx.fillStyle = `rgba(255,255,255,${0.35 + Math.random() * 0.6})`
+      ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill()
+    }
+    const atmo = ctx.createLinearGradient(0, ch * 0.48, 0, ch * 0.57)  // 横向大气亮带增强地球 limb
+    atmo.addColorStop(0, 'rgba(160,205,255,0)'); atmo.addColorStop(0.5, 'rgba(185,220,255,0.6)'); atmo.addColorStop(1, 'rgba(160,205,255,0)')
+    ctx.fillStyle = atmo; ctx.fillRect(0, ch * 0.48, cw, ch * 0.09)
+    for (let i = 0; i < 46; i++) {    // 云带 / 陆地斑
+      const y = ch * 0.6 + Math.random() * ch * 0.38, x = Math.random() * cw
+      ctx.fillStyle = `rgba(${205 + Math.random() * 40},${215 + Math.random() * 35},${225 + Math.random() * 25},${0.12 + Math.random() * 0.22})`
+      ctx.beginPath(); ctx.ellipse(x, y, 14 + Math.random() * 32, 5 + Math.random() * 10, 0, 0, 7); ctx.fill()
+    }
+    const tex = new THREE.CanvasTexture(c)
+    tex.colorSpace = THREE.SRGBColorSpace
+    tex.mapping = THREE.EquirectangularReflectionMapping
+    return tex
+  }
+
+  const skyTex = makeSkyTexture(); disposables.push(skyTex)
+  const spaceTex = makeSpaceTexture(); disposables.push(spaceTex)
   scene.background = skyTex
+  let skyEnvTex = null, spaceEnvTex = null
   try {
     const pmrem = new THREE.PMREMGenerator(renderer)
-    const envRT = pmrem.fromEquirectangular(skyTex)
-    scene.environment = envRT.texture
-    disposables.push(envRT, pmrem)
+    const skyRT = pmrem.fromEquirectangular(skyTex); skyEnvTex = skyRT.texture
+    const spaceRT = pmrem.fromEquirectangular(spaceTex); spaceEnvTex = spaceRT.texture
+    scene.environment = skyEnvTex
+    disposables.push(skyRT, spaceRT, pmrem)
   } catch (e) { console.warn('env map skipped:', e) }
+  // 切换环境：'space' 在轨（深空+地球）| 其它 恒定金色黄昏天空
+  function setEnvironment(env) {
+    const space = env === 'space'
+    scene.background = space ? spaceTex : skyTex
+    if (skyEnvTex && spaceEnvTex) scene.environment = space ? spaceEnvTex : skyEnvTex
+    scene.fog = space ? null : skyFog
+  }
 
   // ---- 光照：低垂暖阳 + 暮色半球光 ----
   const sun = new THREE.DirectionalLight(0xffcf9a, 3.2)
@@ -749,5 +793,5 @@ export function createRocketScene(mount) {
     if (stepLabel.parentNode) stepLabel.parentNode.removeChild(stepLabel)
   }
 
-  return { update, setStage, setVehicle, setRecovery, setPadRise, play, setHighlight, setHoverHandler, dispose }
+  return { update, setStage, setVehicle, setRecovery, setPadRise, setEnvironment, play, setHighlight, setHoverHandler, dispose }
 }

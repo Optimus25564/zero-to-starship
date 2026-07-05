@@ -4,6 +4,7 @@ const P = {
 
 export const level = {
   id: '4.3',
+  env: 'space',   // 二级已入轨：太空背景（底部地球）
   stage: 'ascent',
   title: { zh: '入轨=往旁边飞得够快', en: 'Reaching orbit = flying sideways fast enough' },
   hook: { zh: '很多人以为"入轨"是飞得够高。其实真正的秘密是：往旁边飞得够快，快到你不断往下掉，却总也落不到地面上。', en: 'Many people think "reaching orbit" means flying high enough. The real secret is flying sideways so fast that even though you keep falling, you never actually hit the ground.' },

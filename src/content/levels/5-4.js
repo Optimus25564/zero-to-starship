@@ -8,6 +8,7 @@ const ACTIONS = [
 
 export const level = {
   id: '5.4',
+  env: 'space',   // 二级已入轨：太空背景（底部地球）
   stage: 'ascent',   // 制导在飞行中进行，二级在空中
   title: { zh: 'GNC：机器怎么自己稳住', en: 'GNC: how the machine stabilizes itself' },
   interaction: 'choice',

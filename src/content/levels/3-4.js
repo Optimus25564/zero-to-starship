@@ -4,6 +4,7 @@ const P = {
 
 export const level = {
   id: '3.4',
+  env: 'space',   // 二级已入轨：太空背景（底部地球）
   stage: 'ascent',   // 已分离，二级在空中
   title: { zh: '贮箱增压', en: 'Tank Pressurization' },
   hook: { zh: '推进剂罐子看着是个铁皮桶，其实要一直"打气"撑住——压力低了泵会吸空、薄壁会瘪掉；压力高了罐子直接爆开。', en: 'A propellant tank looks like a metal drum, but it actually has to be "pumped up" the whole time to hold its shape — too little pressure and the pumps cavitate and the thin walls buckle; too much and the tank simply bursts.' },
