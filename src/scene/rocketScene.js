@@ -64,49 +64,66 @@ export function createRocketScene(mount) {
     tex.mapping = THREE.EquirectangularReflectionMapping
     return tex
   }
-  // ---- 太空 / 在轨背景（深空 + 底部地球 + 大气辉光）----
+  // ---- 太空 / 在轨背景：纯深空繁星（地球改用真正的 3D 球体，见下方 makeEarth）----
   function makeSpaceTexture() {
-    const cw = 1024, ch = 512
+    const cw = 2048, ch = 1024   // 高分辨率：星点更锐利，不糊成一团
     const c = document.createElement('canvas'); c.width = cw; c.height = ch
     const ctx = c.getContext('2d')
-    const LIMB = 0.5   // 地球边缘（大气弧）所在的 v，约对应英雄机位画面下沿
+    // 近黑深空
     const g = ctx.createLinearGradient(0, 0, 0, ch)
-    g.addColorStop(0.00, '#01020a')            // 天顶：近黑深空
-    g.addColorStop(LIMB - 0.06, '#03060f')
-    g.addColorStop(LIMB - 0.015, '#0a1e46')    // 逼近地球边缘的暗蓝
-    g.addColorStop(LIMB, '#7fc6ff')            // ★ 明亮大气弧（地球 limb）
-    g.addColorStop(LIMB + 0.02, '#1f6fd0')     // 大气外沿
-    g.addColorStop(LIMB + 0.10, '#1856a8')     // 地球海洋（饱和蓝）
-    g.addColorStop(0.78, '#134a94')
-    g.addColorStop(1.00, '#0e3f84')
+    g.addColorStop(0.00, '#01020a'); g.addColorStop(0.6, '#03040d'); g.addColorStop(1.00, '#05060f')
     ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch)
-    // 深空繁星（只在地球以上，越靠天顶越密）
-    for (let i = 0; i < 900; i++) {
-      const y = Math.random() * ch * (LIMB - 0.04), x = Math.random() * cw
-      const r = Math.random() < 0.12 ? 1.4 + Math.random() * 0.8 : Math.random() * 1.1
-      ctx.fillStyle = `rgba(255,255,255,${0.4 + Math.random() * 0.6})`
+    // 一条淡淡的银河带（斜向柔光）
+    ctx.save(); ctx.translate(cw * 0.5, ch * 0.42); ctx.rotate(-0.32)
+    const mw = ctx.createLinearGradient(0, -150, 0, 150)
+    mw.addColorStop(0, 'rgba(120,140,190,0)'); mw.addColorStop(0.5, 'rgba(150,165,205,0.09)'); mw.addColorStop(1, 'rgba(120,140,190,0)')
+    ctx.fillStyle = mw; ctx.fillRect(-cw, -150, cw * 2, 300); ctx.restore()
+    // 繁星：绝大多数是 1px 锐利小点，少量稍大且带十字光芒
+    for (let i = 0; i < 2600; i++) {
+      const x = Math.random() * cw, y = Math.random() * ch
+      const a = 0.35 + Math.random() * 0.5
+      const tint = Math.random() < 0.14 ? (Math.random() < 0.5 ? '255,225,200' : '205,220,255') : '255,255,255'
+      ctx.fillStyle = `rgba(${tint},${a})`
+      ctx.fillRect(x, y, 1, 1)
+    }
+    for (let i = 0; i < 90; i++) {   // 少量亮星 + 细十字芒
+      const x = Math.random() * cw, y = Math.random() * ch, r = 1 + Math.random() * 1.4
+      ctx.fillStyle = `rgba(255,255,255,${0.8 + Math.random() * 0.2})`
       ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill()
-    }
-    // 大气辉光亮带（在 limb 上叠一条更亮的弧）
-    const atmo = ctx.createLinearGradient(0, ch * (LIMB - 0.02), 0, ch * (LIMB + 0.03))
-    atmo.addColorStop(0, 'rgba(150,210,255,0)'); atmo.addColorStop(0.45, 'rgba(200,235,255,0.85)'); atmo.addColorStop(1, 'rgba(150,210,255,0)')
-    ctx.fillStyle = atmo; ctx.fillRect(0, ch * (LIMB - 0.02), cw, ch * 0.05)
-    // 地球上的云带
-    for (let i = 0; i < 40; i++) {
-      const y = ch * (LIMB + 0.08) + Math.random() * ch * 0.4, x = Math.random() * cw
-      ctx.fillStyle = `rgba(235,242,250,${0.14 + Math.random() * 0.26})`
-      ctx.beginPath(); ctx.ellipse(x, y, 16 + Math.random() * 36, 5 + Math.random() * 9, 0, 0, 7); ctx.fill()
-    }
-    // 地球上的陆块（绿褐）
-    for (let i = 0; i < 14; i++) {
-      const y = ch * (LIMB + 0.14) + Math.random() * ch * 0.34, x = Math.random() * cw
-      const gr = Math.random() < 0.5
-      ctx.fillStyle = gr ? `rgba(90,140,80,${0.3 + Math.random() * 0.25})` : `rgba(150,125,85,${0.28 + Math.random() * 0.22})`
-      ctx.beginPath(); ctx.ellipse(x, y, 22 + Math.random() * 40, 9 + Math.random() * 14, 0, 0, 7); ctx.fill()
+      ctx.strokeStyle = `rgba(255,255,255,${0.18})`; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.moveTo(x - r * 3, y); ctx.lineTo(x + r * 3, y); ctx.moveTo(x, y - r * 3); ctx.lineTo(x, y + r * 3); ctx.stroke()
     }
     const tex = new THREE.CanvasTexture(c)
     tex.colorSpace = THREE.SRGBColorSpace
     tex.mapping = THREE.EquirectangularReflectionMapping
+    tex.anisotropy = 4
+    return tex
+  }
+  // 地球贴图：深蓝海洋 + 大陆 + 云。贴到大球上、置于场景下方，露出弯曲的地平弧线。
+  function makeEarthTexture() {
+    const cw = 1024, ch = 512
+    const c = document.createElement('canvas'); c.width = cw; c.height = ch
+    const ctx = c.getContext('2d')
+    const g = ctx.createLinearGradient(0, 0, 0, ch)
+    g.addColorStop(0, '#0a3c86'); g.addColorStop(0.5, '#1466b8'); g.addColorStop(1, '#0c4a97')
+    ctx.fillStyle = g; ctx.fillRect(0, 0, cw, ch)
+    // 大陆块（绿褐不规则斑）
+    for (let i = 0; i < 26; i++) {
+      const x = Math.random() * cw, y = Math.random() * ch
+      const green = Math.random() < 0.55
+      ctx.fillStyle = green ? `rgba(78,132,72,${0.55 + Math.random() * 0.3})` : `rgba(150,126,84,${0.5 + Math.random() * 0.3})`
+      ctx.beginPath()
+      const n = 7 + ((Math.random() * 5) | 0), rr = 30 + Math.random() * 70
+      for (let k = 0; k <= n; k++) { const a = (k / n) * 7, r = rr * (0.5 + Math.random() * 0.7); const px = x + Math.cos(a) * r, py = y + Math.sin(a) * r * 0.7; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py) }
+      ctx.closePath(); ctx.fill()
+    }
+    // 云带（白色柔絮）
+    for (let i = 0; i < 90; i++) {
+      const x = Math.random() * cw, y = Math.random() * ch
+      ctx.fillStyle = `rgba(245,249,255,${0.12 + Math.random() * 0.34})`
+      ctx.beginPath(); ctx.ellipse(x, y, 20 + Math.random() * 55, 7 + Math.random() * 13, Math.random(), 0, 7); ctx.fill()
+    }
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace
     return tex
   }
 
@@ -121,12 +138,29 @@ export function createRocketScene(mount) {
     scene.environment = skyEnvTex
     disposables.push(skyRT, spaceRT, pmrem)
   } catch (e) { console.warn('env map skipped:', e) }
-  // 切换环境：'space' 在轨（深空+地球）| 其它 恒定金色黄昏天空
+  // ---- 地球：一颗大球置于场景下方，露出弯曲的地平弧线（仅在轨 'space' 环境显示）----
+  const earthR = 120
+  const earthTex = makeEarthTexture(); disposables.push(earthTex)
+  const earth = new THREE.Mesh(
+    new THREE.SphereGeometry(earthR, 64, 48),
+    new THREE.MeshStandardMaterial({ map: earthTex, roughness: 1.0, metalness: 0.0, emissive: 0x0a2748, emissiveIntensity: 0.35, fog: false })
+  )
+  earth.position.set(0, -earthR - 1.5, -16)   // 顶点约在 y≈-1.5，弧线横在画面下部
+  earth.visible = false; scene.add(earth)
+  // 大气辉光：比地球略大的一层背面加色蓝壳，边缘透出蓝光
+  const atmo = new THREE.Mesh(
+    new THREE.SphereGeometry(earthR * 1.045, 64, 48),
+    new THREE.MeshBasicMaterial({ color: 0x5aa8ff, transparent: true, opacity: 0.22, side: THREE.BackSide, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })
+  )
+  atmo.position.copy(earth.position); atmo.visible = false; scene.add(atmo)
+
+  // 切换环境：'space' 在轨（深空 + 弯曲地球）| 其它 恒定金色黄昏天空
   function setEnvironment(env) {
     const space = env === 'space'
     scene.background = space ? spaceTex : skyTex
     if (skyEnvTex && spaceEnvTex) scene.environment = space ? spaceEnvTex : skyEnvTex
     scene.fog = space ? null : skyFog
+    earth.visible = atmo.visible = space
   }
 
   // ---- 光照：低垂暖阳 + 暮色半球光 ----
