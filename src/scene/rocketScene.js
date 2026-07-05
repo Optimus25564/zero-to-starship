@@ -544,17 +544,17 @@ export function createRocketScene(mount) {
       anim.t += 0.016
       if (anim.type === 'separate') {
         // 星舰热分离 4 步慢动作：① 一级关大部分主机 → ② 二级点火(热分离,还没分开就点火) → ③ 级间分离 → ④ 一级抛级间环·掉头
-        const t = anim.t
-        if (t < 2.5) {                        // ① 一级降推力、关大部分主机（留中心机）
+        const at = anim.t   // 注意：不要用变量名 t，会遮蔽 i18n 的 t()
+        if (at < 2.5) {                       // ① 一级降推力、关大部分主机（留中心机）
           sepStep = t({ zh: '① 一级关大部分主机', en: '① Booster throttles down' })
-          flameThrust = 120000 + (t < 1.5 ? 700000 * (1 - t / 1.5) : 0)   // 满推力→很低
+          flameThrust = 120000 + (at < 1.5 ? 700000 * (1 - at / 1.5) : 0)   // 满推力→很低
           rocketY = 2.4 + Math.sin(time * 2) * 0.06
-        } else if (t < 5.0) {                 // ② 二级点火·热分离：还叠在一级顶上就点火，喷流从级间环排出
+        } else if (at < 5.0) {                // ② 二级点火·热分离：还叠在一级顶上就点火，喷流从级间环排出
           sepStep = t({ zh: '② 二级点火 · 热分离', en: '② Ship ignites — hot-staging' })
-          flameThrust = Math.max(0, 120000 * (1 - (t - 2.5) / 0.8))       // 一级熄火
+          flameThrust = Math.max(0, 120000 * (1 - (at - 2.5) / 0.8))       // 一级熄火
           shipThrust = 760000
           sepGap = Math.min(sepGap + 0.006, 0.45); positionShip()         // 只开一条排焰缝
-        } else if (t < 7.5) {                 // ③ 级间分离：二级喷流把一级顶开
+        } else if (at < 7.5) {                // ③ 级间分离：二级喷流把一级顶开
           sepStep = t({ zh: '③ 级间分离', en: '③ Stage separation' })
           shipThrust = 740000
           sepGap = Math.min(sepGap + 0.02, 2.6); positionShip()
