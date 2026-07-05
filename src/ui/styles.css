@@ -30,6 +30,12 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .seq-reset { padding: 3px 12px 3px 9px; border: 1px dashed #5a6472; border-radius: 14px; background: transparent; color: #9fb0c4; font-size: 12px; cursor: pointer; }
 .seq-reset:hover { color: #e6ebf2; border-color: #8aa0b8; }
 
+/* 选择题选项：默认暗底，选中态蓝色高亮 + 边框发光 */
+.choice-option { display: block; width: 100%; text-align: left; margin: 6px 0; padding: 9px 13px; border: 1px solid #33415e; border-radius: 8px; background: rgba(255,255,255,.04); color: #dbe6f7; font-size: 13px; line-height: 1.35; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
+.choice-option:hover { border-color: #4a6fb0; background: rgba(47,107,255,.12); }
+.choice-option.selected { border-color: #2f6bff; background: rgba(47,107,255,.28); color: #fff; font-weight: 600; box-shadow: 0 0 0 1px #2f6bff, 0 2px 12px rgba(47,107,255,.35); }
+.choice-option.selected::before { content: "✓ "; color: #9fd0ff; }
+
 .blueprint-overlay { position: fixed; inset: 0; pointer-events: none; }
 .bp-formula { position: absolute; top: 92px; left: 16px; max-width: 380px; text-align: left; background: rgba(0,40,80,.72); border: 1px solid #3aa0ff; color: #bfe4ff; padding: 8px 14px; border-radius: 8px; font-family: ui-monospace, monospace; font-size: 13px; }
 .bp-arrows { position: absolute; right: 24px; top: 50%; transform: translateY(-50%); display: flex; gap: 24px; align-items: flex-end; }
