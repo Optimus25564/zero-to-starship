@@ -45,6 +45,7 @@ export function createHud(mount, { onLaunch, onNext, onPrev }) {
     hookEl,
     relocalize,
     setPrevVisible: (v) => { prevBtn.style.display = v ? '' : 'none' },
+    setLaunchVisible: (v) => { launchBtn.style.display = v ? '' : 'none' },
     setHook: (t) => { hookEl.textContent = t },
     setGoal: (t) => { goalEl.textContent = `🎯 ${t}` },
     setFeedback: ({ goalMet, message }) => {

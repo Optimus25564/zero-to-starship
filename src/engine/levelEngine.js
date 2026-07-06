@@ -52,6 +52,8 @@ export function startGame(mount) {
       reentryAngle: params.reentryAngle ?? null,   // 6.2 再入动画用
       reentryShallow: !!derived.tooShallow,
       reentrySteep: !!derived.tooSteep,
+      choiceKey: params.choice ?? null,   // 5.4 GNC：按所选控制动作演不同姿控结局
+      orbitSpeed: params.horizontalV ?? null,   // 4.3：横向速度 → 地球滑过的速度感
     })
     const noPick = current.interaction === 'choice' && !params.choice
     overlay.update({
@@ -80,6 +82,8 @@ export function startGame(mount) {
       reentryAngle: params.reentryAngle ?? null,   // 6.2 再入动画用
       reentryShallow: !!derived.tooShallow,
       reentrySteep: !!derived.tooSteep,
+      choiceKey: params.choice ?? null,   // 5.4 GNC：按所选控制动作演不同姿控结局
+      orbitSpeed: params.horizontalV ?? null,   // 4.3：横向速度 → 地球滑过的速度感
     })
     scene.play(goalMet) // 播发射/着陆动画
     const message = goalMet
@@ -93,7 +97,7 @@ export function startGame(mount) {
       progression.complete(current.id, stars)
       const m = MILESTONES[current.milestoneId]
       // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-      const delay = current.recovery === 'full' ? 19000 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
+      const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'full' ? 27000 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
       clearTimeout(milestoneTimer)
       milestoneTimer = setTimeout(() => hud.showMilestone({ title: t(m.title), fact: t(m.fact), stars }), delay)
     }
@@ -134,14 +138,19 @@ export function startGame(mount) {
     scene.setRecovery(level.recovery || 'simple')
     scene.setPadRise(!!level.padRise)
     scene.setEnvironment(level.env || 'sky')   // 入轨关切成太空背景（底部地球）
+    scene.setOrbitFlight(level.orbitFlight || null)   // 4.3/4.4：二级横向贴地平线飞（入轨=往旁边飞）
+    scene.setGnc(!!level.gnc)                          // 5.4：闭环姿控动画
     scene.setHighlight(level.highlight || null)
     // 侧边图面板只保留"没法画在火箭上的复杂流程"：火星 Sabatier(8.1)、发动机全流量循环(2.3)、
     // 栅格舵(6.1)、自生增压(3.4)；其余就地标在主火箭
     const PANEL_LEVELS = new Set(['8.1', '2.3', '6.1', '3.4'])
     diagramPanel.setDiagram(PANEL_LEVELS.has(level.id) ? level.diagram : null)
 
-    if (interactionMod) interactionMod.destroy()
-    if (level.interaction === 'choice') {
+    if (interactionMod) { interactionMod.destroy(); interactionMod = null }
+    hud.setLaunchVisible(!level.finale)   // 结尾页没有"发射"，就一张火星合影
+    if (level.finale) {
+      params = {}
+    } else if (level.interaction === 'choice') {
       params = { choice: null }   // 不默认选中，玩家自己选
       interactionMod = createChoiceModule(
         hud.slot,

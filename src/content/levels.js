@@ -24,6 +24,7 @@ export const ORDER = [
   '6.2', // 再入走廊（二级返回）
   '8.1', // 在火星上造燃料（Sabatier ISRU）
   '8.3', // 复用经济学
+  'finale', // 结尾页：火星地表 + 小宇航员合影
 ]
 
 function orderKey(level) {

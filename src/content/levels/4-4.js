@@ -13,6 +13,7 @@ const eq = (a, b) => a.length === b.length && a.every((x, i) => x === b[i])
 export const level = {
   id: '4.4',
   env: 'space',   // 二级已入轨：太空背景（底部地球）
+  orbitFlight: 'insert',   // 横向飞：两次点火（主机加速→滑行→远地点圆化）入轨
   stage: 'ascent',   // 二级点火入轨：早已分离，二级独自在空中，不在发射架上
   title: { zh: '二级点火入轨', en: 'Second-stage burn to orbit' },
   interaction: 'sequence',

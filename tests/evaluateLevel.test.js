@@ -26,7 +26,9 @@ describe('LEVELS 配置', () => {
       expect(typeof gt === 'string' || (gt && typeof gt.zh === 'string' && typeof gt.en === 'string')).toBe(true)
       expect(typeof l.formulaHUD).toBe('function')
       expect(typeof l.goal.check).toBe('function')
-      if (l.interaction === 'choice') {
+      if (l.finale) {
+        continue   // 结尾页：无交互、无参数
+      } else if (l.interaction === 'choice') {
         expect(l.options.length).toBeGreaterThan(0)
       } else if (l.interaction === 'sequence') {
         expect(l.steps.length).toBeGreaterThan(0)
@@ -37,6 +39,7 @@ describe('LEVELS 配置', () => {
   })
   it('每关的 milestoneId 都能在 MILESTONES 找到对应条目', () => {
     for (const l of LEVELS) {
+      if (!l.milestoneId) continue   // 结尾页等无里程碑的关卡跳过
       expect(MILESTONES[l.milestoneId], `缺少里程碑：${l.id} -> ${l.milestoneId}`).toBeTruthy()
     }
   })
