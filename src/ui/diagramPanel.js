@@ -41,6 +41,7 @@ export function createDiagramPanel(mount) {
     }
   }
   function hide() {
+    mount.classList.remove('diagram-open')   // 恢复被隐去的关卡文字/控件
     if (!visible) return
     visible = false
     panel.classList.add('hidden')
@@ -79,7 +80,7 @@ export function createDiagramPanel(mount) {
       else scheduleHide()
     },
     // 进关自动弹出（手机等无悬停设备用）：固定显示，直到点 ✕ 关闭
-    present() { if (current) { pinned = true; show() } },
+    present() { if (current) { pinned = true; mount.classList.add('diagram-open'); show() } },  // 独占展示：隐去其它文字，直到点 ✕
     destroy() { clear3d(); if (hideTimer) clearTimeout(hideTimer); if (root.parentNode) root.parentNode.removeChild(root) },
   }
 }

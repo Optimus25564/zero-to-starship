@@ -90,6 +90,8 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 /* ---- 发射时“运镜模式”：淡出文字/控件，把画面让给动画；动画演完自动淡回 ---- */
 .hud-hook, .hud-panel, .bp-formula, .bp-arrows { transition: opacity .4s ease; }
 .playing .hud-hook, .playing .hud-panel, .playing .bp-formula, .playing .bp-arrows { opacity: 0; pointer-events: none; }
+/* 讲解图独占展示时，隐去其它文字/控件（点 ✕ 关掉后恢复） */
+.diagram-open .hud-hook, .diagram-open .hud-panel, .diagram-open .bp-formula, .diagram-open .scene-step { opacity: 0 !important; pointer-events: none !important; }
 
 /* ---- 结尾页：Amie 的三幕旅程（起飞→太空→火星），背景是开场那片橘色黄昏天空 ---- */
 .finale-art { position: fixed; inset: 0; z-index: 36; overflow-y: auto; -webkit-overflow-scrolling: touch;
