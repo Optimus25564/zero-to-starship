@@ -22,8 +22,18 @@ export function startGame(mount) {
   // 结尾页:把女儿画的火星裱起来展示（默认隐藏，仅 finale 关卡显示）
   const finaleArt = document.createElement('div')
   finaleArt.className = 'finale-art hidden'
-  finaleArt.innerHTML = `<img src="${marsDrawingUrl}" alt="Mars, drawn by a young explorer" /><div class="finale-art-cap"></div>`
+  finaleArt.innerHTML = `
+    <div class="finale-inner">
+      <div class="finale-msg"></div>
+      <div class="finale-frame"><img src="${marsDrawingUrl}" alt="Mars, drawn by a young explorer" /></div>
+      <div class="finale-art-cap"></div>
+      <button class="finale-back"></button>
+    </div>`
   mount.appendChild(finaleArt)
+  finaleArt.querySelector('.finale-back').addEventListener('click', () => {
+    const prev = progression.prevId(current.id)
+    if (prev) loadLevel(prev)
+  })
   scene.setHoverHandler((info) => {
     if (info) partLabel.show(info); else partLabel.hide()
     diagramPanel.setHoverVisible(!!info)
@@ -162,10 +172,15 @@ export function startGame(mount) {
     hud.setLaunchVisible(!level.finale)   // 结尾页没有"发射"，就一张火星合影
     finaleArt.classList.toggle('hidden', !level.finale)
     if (level.finale) {
-      finaleArt.querySelector('.finale-art-cap').textContent = t({
-        zh: '“火星（看着像月球…不过没关系啦）” —— 送给未来的火星旅行者 🚀',
-        en: '“Mars (look like moon but… oh well.)” — for a future Mars explorer 🚀',
+      finaleArt.querySelector('.finale-msg').textContent = t({
+        zh: '🎉 你做到了 —— 从零造出星舰，一路飞到火星。',
+        en: '🎉 You made it — from nothing to a Starship, all the way to Mars.',
       })
+      finaleArt.querySelector('.finale-art-cap').textContent = t({
+        zh: '“火星（看着像月球…不过没关系啦）” —— 一位未来宇航员画 🚀',
+        en: '“Mars (look like moon but… oh well.)” — by a future astronaut 🚀',
+      })
+      finaleArt.querySelector('.finale-back').textContent = t({ zh: '← 上一关', en: '← Back' })
     }
     if (level.finale) {
       params = {}
