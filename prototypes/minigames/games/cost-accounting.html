@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>出租车经济学 · Taxi Economics</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  /* game-specific bits only (rest comes from common.css) */
+  .steptag{display:inline-block; font-size:11px; font-weight:700; letter-spacing:.5px;
+           padding:2px 9px; border-radius:999px; background:var(--panel2); color:var(--muted); margin-bottom:8px}
+  .steptag.a{background:rgba(255,90,90,.14); color:#ff9b9b}
+  .steptag.b{background:rgba(87,211,140,.14); color:var(--ok)}
+  .stepcard{border:1px solid var(--line); border-radius:12px; background:var(--panel2);
+            padding:12px 14px; margin-bottom:10px; font-size:14px; line-height:1.55;
+            animation:pop .28s ease}
+  .stepcard.calc{border-color:#3a4a6a; background:#141d33}
+  @keyframes pop{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+  .stepcard b{color:var(--flame2)}
+  .calcline{font-size:16px; font-variant-numeric:tabular-nums; margin-top:2px}
+  .res{display:inline-block; font-weight:800; font-size:20px; color:var(--flame2);
+       padding:2px 8px; border-radius:8px; background:rgba(255,140,66,.12); margin-left:2px}
+  .stepcard.calc.b .res{color:var(--ok); background:rgba(87,211,140,.14)}
+  .note{color:var(--muted); font-size:12px; margin-top:8px}
+  .note b{color:var(--ink); font-weight:600}
+  .cmpval{font-variant-numeric:tabular-nums; font-weight:700; color:var(--ink)}
+  .fb-ok{color:var(--ok); font-weight:600}
+  .fb-bad{color:#ff9b9b; font-weight:600}
+</style>
+</head>
+<body>
+  <header>
+    <div class="htitle"><h1 id="title">出租车经济学</h1><span class="en" id="titleEn">Taxi Economics</span></div>
+    <div class="headright">
+      <a class="backlink" href="../index.html" id="back">← 目录</a>
+      <span class="langtoggle" id="langBtn">EN</span>
+    </div>
+  </header>
+
+  <p class="hook" id="hook"></p>
+
+  <div class="panel">
+    <div class="q" id="wsTitle"></div>
+    <div id="steps"></div>
+    <div class="buttons">
+      <button class="fire" id="nextBtn"></button>
+      <button class="ghost" id="resetBtn"></button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="comparePanel">
+    <div class="q" id="cmpTitle"></div>
+    <div class="meters" id="cmpMeters"></div>
+    <div class="feedback" id="cmpConcl"></div>
+  </div>
+
+  <div class="panel hidden" id="quizPanel">
+    <div class="q" id="quizQ"></div>
+    <div class="choices" id="quizChoices"></div>
+    <div class="feedback" id="quizFb"></div>
+  </div>
+
+  <div class="badge" id="badge">
+    <span class="medal">🏅</span>
+    <span id="badgeText"></span>
+  </div>
+
+<script>
+(() => {
+  const GAME_ID = 'cost-accounting';
+
+  // ---------- honest arithmetic model (everything computed, nothing hardcoded) ----------
+  const M = {};
+  M.rocket   = 500000000;               // 造火箭 5亿元
+  M.payA     = 20;                      // 不回收：每次 20 吨
+  M.perTonA  = M.rocket / M.payA;       // = 25,000,000  (2500万/吨)
+  M.payPerB  = 16;                      // 回收：每次 16 吨（留燃料回家）
+  M.flights  = 10;                      // 一枚火箭飞 10 次
+  M.refurb   = 30000000;                // 每次翻新 0.3亿
+  M.totalPayB   = M.payPerB * M.flights;                 // 160 吨
+  M.refurbCount = M.flights - 1;                          // 9 次翻新（第 1 次是新火箭）
+  M.totalCostB  = M.rocket + M.refurbCount * M.refurb;    // 7.7亿 = 770,000,000
+  M.perTonB     = M.totalCostB / M.totalPayB;             // ≈ 4,812,500 (≈481万/吨)
+  M.ratio       = M.perTonA / M.perTonB;                  // ≈ 5.19
+  M.drop        = Math.round((1 - M.payPerB / M.payA) * 100); // 20 (%)
+  const ratio1  = Math.round(M.ratio * 10) / 10;          // 5.2
+
+  let lang = 'zh';
+
+  // ---------- money formatting (lang-aware, all derived) ----------
+  function trim(n){ return (Math.round(n * 100) / 100).toString(); }
+  function money(n){
+    if(lang === 'en') return trim(n / 1e6) + 'M ¥';
+    if(Math.abs(n) >= 1e8) return trim(n / 1e8) + '亿';
+    return trim(n / 1e4) + '万';
+  }
+  function perTonStr(n){
+    if(lang === 'en') return '≈' + (Math.round(n / 1e4) / 100) + 'M ¥';
+    return '≈' + Math.round(n / 1e4) + '万';
+  }
+
+  // ---------- i18n ----------
+  const T = {
+    zh: {
+      title:'出租车经济学', titleEn:'Taxi Economics', lang:'EN', back:'← 目录',
+      hook:'马斯克：火箭贵，不是材料贵（原料只占约 <b>2%</b>！），是因为<b>只用一次</b>。算笔账。',
+      wsTitle:'一步步算：同一枚火箭，扔掉 vs 回收，哪种运货更便宜？',
+      next:'下一步 ▸', done:'账算完了 ✓', reset:'重算',
+      steps: [
+        { tag:'情景 A · 不回收', cls:'a', calc:false,
+          html:()=>`火箭造价 <b>${money(M.rocket)}</b>，每次运 <b>${M.payA} 吨</b>货，火箭 <b>只用 1 次</b>就扔掉。` },
+        { tag:'算 A 的每吨成本', cls:'a', calc:true,
+          html:()=>`<div class="calcline">${money(M.rocket)} ÷ ${M.payA} 吨 = <span class="res">${money(M.perTonA)}/吨</span></div>
+                    <div class="note"><b>${money(M.perTonA)}</b> 运一吨！差不多要花掉<b>一整栋楼</b>，才把一吨东西送上天。</div>` },
+        { tag:'情景 B · 回收', cls:'b', calc:false,
+          html:()=>`同一枚火箭，但让它<b>飞回来重复用</b>。为了留燃料回家，每次只能运 <b>${M.payPerB} 吨</b>（运力被回收吃掉约 <b>${M.drop}%</b>）。这枚火箭能飞 <b>${M.flights} 次</b>，每次落地后翻新要 <b>${money(M.refurb)}</b>。` },
+        { tag:'先算 B 的总运力', cls:'b', calc:true,
+          html:()=>`<div class="calcline">${M.payPerB} 吨 × ${M.flights} 次 = <span class="res">${M.totalPayB} 吨</span></div>
+                    <div class="note">飞 10 趟，总共能运这么多货。</div>` },
+        { tag:'再算 B 的总成本', cls:'b', calc:true,
+          html:()=>`<div class="note" style="margin-top:0">第 <b>1</b> 次用的是<b>新火箭</b>，后面 <b>${M.refurbCount}</b> 次每次翻新一下就能再飞。</div>
+                    <div class="calcline" style="margin-top:8px">${money(M.rocket)} + ${M.refurbCount} × ${money(M.refurb)} = ${money(M.rocket)} + ${money(M.refurbCount*M.refurb)} = <span class="res">${money(M.totalCostB)}</span></div>` },
+        { tag:'算 B 的每吨成本', cls:'b', calc:true,
+          html:()=>`<div class="calcline">${money(M.totalCostB)} ÷ ${M.totalPayB} 吨 = <span class="res">${perTonStr(M.perTonB)}/吨</span></div>
+                    <div class="note">摊到每一吨，一下子便宜了好多。</div>` }
+      ],
+      cmpTitle:'对比：谁运一吨更便宜？',
+      cmpA:'不回收 (扔掉)', cmpB:'回收 (飞 10 次)',
+      cmpConcl:()=>`回收比不回收便宜 <b>约 ${ratio1} 倍</b>！回收吃掉约 <b>${M.drop}%</b> 运力（${M.payA}→${M.payPerB} 吨），少运了点货，<b>但每吨还是便宜 5 倍</b> —— 这笔买卖，值！`,
+      quizQ:'最后一问：火箭这么贵，主要因为——',
+      quizA:'造火箭的金属特别贵', quizB:'每枚只用一次，制造成本全摊在这一次飞行上',
+      fbWrong:'错！原料只占约 <b>2%</b>。贵的是"<b>只飞一次</b>"—— 5 亿造价全压在一趟上。<br><span class="fb-bad">炸了？又一份数据。</span> 再想想，选另一个。',
+      fbRight:'<span class="fb-ok">对！</span> 同一枚火箭飞 10 次，造价被摊薄，每吨立刻便宜 <b>5 倍</b>。这就是回收的意义 —— 火箭要像<b>出租车</b>，不是一次性纸杯。',
+      badgeLocked:'徽章未解锁：把两笔每吨成本都算出来，再答对最后一问，即可获得「首席会计师」。',
+      badgeEarned:'已获得徽章「首席会计师」—— 你算明白了：火箭贵在"只用一次"，回收让每吨便宜 5 倍。'
+    },
+    en: {
+      title:'Taxi Economics', titleEn:'出租车经济学', lang:'中', back:'← Menu',
+      hook:'Musk: Rockets aren\'t expensive because of materials (raw metal is only ~<b>2%</b>!) — they\'re expensive because each is used <b>once</b>. Do the math.',
+      wsTitle:'Step by step: same rocket — throw it away vs. reuse it. Which hauls cargo cheaper?',
+      next:'Next ▸', done:'Account done ✓', reset:'Redo',
+      steps: [
+        { tag:'Case A · Expendable', cls:'a', calc:false,
+          html:()=>`Rocket costs <b>${money(M.rocket)}</b>, carries <b>${M.payA} tons</b> of cargo, and is <b>used only once</b>, then thrown away.` },
+        { tag:'A: cost per ton', cls:'a', calc:true,
+          html:()=>`<div class="calcline">${money(M.rocket)} ÷ ${M.payA} tons = <span class="res">${money(M.perTonA)}/ton</span></div>
+                    <div class="note"><b>${money(M.perTonA)}</b> per ton! Roughly the price of <b>a whole building</b> just to lift one ton to space.</div>` },
+        { tag:'Case B · Reusable', cls:'b', calc:false,
+          html:()=>`Same rocket, but it <b>flies back and gets reused</b>. To save fuel for the trip home it can only carry <b>${M.payPerB} tons</b> (reuse eats about <b>${M.drop}%</b> of capacity). This rocket flies <b>${M.flights} times</b>, and each landing needs a refurbish costing <b>${money(M.refurb)}</b>.` },
+        { tag:'B: total cargo first', cls:'b', calc:true,
+          html:()=>`<div class="calcline">${M.payPerB} tons × ${M.flights} flights = <span class="res">${M.totalPayB} tons</span></div>
+                    <div class="note">Over 10 trips, that\'s the total cargo hauled.</div>` },
+        { tag:'B: total cost next', cls:'b', calc:true,
+          html:()=>`<div class="note" style="margin-top:0">Flight <b>1</b> uses the <b>new rocket</b>; the next <b>${M.refurbCount}</b> flights each just need a refurbish.</div>
+                    <div class="calcline" style="margin-top:8px">${money(M.rocket)} + ${M.refurbCount} × ${money(M.refurb)} = ${money(M.rocket)} + ${money(M.refurbCount*M.refurb)} = <span class="res">${money(M.totalCostB)}</span></div>` },
+        { tag:'B: cost per ton', cls:'b', calc:true,
+          html:()=>`<div class="calcline">${money(M.totalCostB)} ÷ ${M.totalPayB} tons = <span class="res">${perTonStr(M.perTonB)}/ton</span></div>
+                    <div class="note">Spread across every ton, it suddenly gets much cheaper.</div>` }
+      ],
+      cmpTitle:'Compare: which hauls a ton cheaper?',
+      cmpA:'Expendable (thrown away)', cmpB:'Reusable (10 flights)',
+      cmpConcl:()=>`Reusable is about <b>${ratio1}× cheaper</b>! Reuse eats ~<b>${M.drop}%</b> of capacity (${M.payA}→${M.payPerB} tons) so you haul a bit less, <b>but each ton is still 5× cheaper</b> — worth it!`,
+      quizQ:'Last question: rockets are expensive mainly because—',
+      quizA:'The metal to build them is very expensive', quizB:'Each is used only once, so the whole build cost lands on one flight',
+      fbWrong:'Nope — raw materials are only ~<b>2%</b>. The expensive part is "<b>flying once</b>" — the full 500M build cost lands on a single trip.<br><span class="fb-bad">Boom? Another data point.</span> Think again — pick the other one.',
+      fbRight:'<span class="fb-ok">Correct!</span> Fly one rocket 10 times and the build cost spreads out — each ton is instantly <b>5× cheaper</b>. That\'s the point of reuse: a rocket should be a <b>taxi</b>, not a paper cup.',
+      badgeLocked:'Badge locked: reveal both per-ton costs, then answer the last question correctly to earn "Chief Accountant".',
+      badgeEarned:'Badge earned: "Chief Accountant" — you proved it: rockets are dear because they fly once; reuse makes each ton 5× cheaper.'
+    }
+  };
+
+  // ---------- state ----------
+  let revealed = 1;               // how many steps are shown (1..6)
+  const STEP_N = T.zh.steps.length;
+  let quizPick = null;            // 'A' | 'B' | null
+  let earned = false;
+  try { earned = localStorage.getItem('mg.badge.' + GAME_ID) === '1'; } catch(e){}
+
+  // ---------- DOM ----------
+  const $ = id => document.getElementById(id);
+  const stepsEl = $('steps'), nextBtn = $('nextBtn'), resetBtn = $('resetBtn');
+  const comparePanel = $('comparePanel'), quizPanel = $('quizPanel');
+  const cmpMeters = $('cmpMeters'), cmpConcl = $('cmpConcl');
+  const quizChoices = $('quizChoices'), quizFb = $('quizFb');
+  const badgeEl = $('badge'), badgeText = $('badgeText');
+
+  const done = () => revealed >= STEP_N;
+
+  // ---------- render ----------
+  function renderSteps(){
+    const steps = T[lang].steps;
+    let html = '';
+    for(let i = 0; i < revealed; i++){
+      const s = steps[i];
+      html += `<div class="stepcard ${s.calc ? 'calc ' + s.cls : ''}">
+                 <span class="steptag ${s.cls}">${s.tag}</span>
+                 <div>${s.html()}</div>
+               </div>`;
+    }
+    stepsEl.innerHTML = html;
+  }
+
+  function renderCompare(){
+    const t = T[lang];
+    const wB = (M.perTonB / M.perTonA * 100).toFixed(1);
+    cmpMeters.innerHTML = `
+      <div class="meter">
+        <div class="mlabel"><span>${t.cmpA}</span><span class="cmpval">${money(M.perTonA)}/${lang==='en'?'ton':'吨'}</span></div>
+        <div class="mbar"><div class="mfill bad" style="width:100%"></div></div>
+      </div>
+      <div class="meter">
+        <div class="mlabel"><span>${t.cmpB}</span><span class="cmpval">${perTonStr(M.perTonB)}/${lang==='en'?'ton':'吨'}</span></div>
+        <div class="mbar"><div class="mfill ok" style="width:${wB}%"></div></div>
+      </div>`;
+    cmpConcl.innerHTML = t.cmpConcl();
+  }
+
+  function renderQuiz(){
+    const t = T[lang];
+    $('quizQ').innerHTML = t.quizQ;
+    const rows = [
+      { key:'A', txt:t.quizA },
+      { key:'B', txt:t.quizB }
+    ];
+    quizChoices.innerHTML = rows.map(r => {
+      let cls = 'choice';
+      if(quizPick){
+        if(r.key === 'B') cls += ' correct';       // reveal the right one once answered
+        else if(quizPick === 'A') cls += ' wrong';
+      }
+      return `<button class="${cls}" data-key="${r.key}">
+                <span class="key">${r.key}</span><span>${r.txt}</span>
+              </button>`;
+    }).join('');
+    quizChoices.querySelectorAll('.choice').forEach(b =>
+      b.addEventListener('click', () => pickAnswer(b.dataset.key)));
+    if(quizPick === 'A')      quizFb.innerHTML = t.fbWrong;
+    else if(quizPick === 'B') quizFb.innerHTML = t.fbRight;
+    else                      quizFb.innerHTML = '';
+  }
+
+  function renderBadge(){
+    badgeEl.className = 'badge' + (earned ? ' earned' : '');
+    badgeText.innerHTML = earned ? T[lang].badgeEarned : T[lang].badgeLocked;
+  }
+
+  function renderStatic(){
+    const t = T[lang];
+    $('title').textContent = t.title;
+    $('titleEn').textContent = t.titleEn;
+    $('langBtn').textContent = t.lang;
+    $('back').textContent = t.back;
+    $('hook').innerHTML = t.hook;
+    $('wsTitle').innerHTML = t.wsTitle;
+    $('cmpTitle').innerHTML = t.cmpTitle;
+    nextBtn.textContent = done() ? t.done : t.next;
+    nextBtn.disabled = done();
+    resetBtn.textContent = t.reset;
+    document.documentElement.lang = lang;
+  }
+
+  function renderAll(){
+    renderStatic();
+    renderSteps();
+    if(done()){
+      comparePanel.classList.remove('hidden');
+      quizPanel.classList.remove('hidden');
+      renderCompare();
+      renderQuiz();
+    } else {
+      comparePanel.classList.add('hidden');
+      quizPanel.classList.add('hidden');
+    }
+    renderBadge();
+  }
+
+  // ---------- actions ----------
+  function next(){
+    if(done()) return;
+    revealed++;
+    renderAll();
+    if(done()) comparePanel.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+  function reset(){
+    revealed = 1;
+    quizPick = null;
+    renderAll();
+  }
+  function pickAnswer(key){
+    quizPick = key;
+    if(key === 'B' && !earned){
+      earned = true;
+      try { localStorage.setItem('mg.badge.' + GAME_ID, '1'); } catch(e){}
+    }
+    renderQuiz();
+    renderBadge();
+    if(key === 'B') badgeEl.scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+
+  // ---------- events ----------
+  nextBtn.addEventListener('click', next);
+  resetBtn.addEventListener('click', reset);
+  $('langBtn').addEventListener('click', () => {
+    lang = lang === 'zh' ? 'en' : 'zh';
+    renderAll();
+  });
+
+  // ---------- init ----------
+  renderAll();
+})();
+</script>
+</body>
+</html>

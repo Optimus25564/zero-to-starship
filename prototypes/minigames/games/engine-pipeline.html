@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>发动机流水线 · Engine Pipeline</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  /* ---- game-specific: card-ordering UI (not covered by common.css) ---- */
+  .slots{display:flex; flex-direction:column; gap:10px; margin-bottom:14px}
+  .slot{display:flex; align-items:stretch; gap:10px; min-height:58px}
+  .slotnum{flex:0 0 40px; display:grid; place-items:center; font-size:22px; font-weight:800;
+           color:var(--flame2); background:var(--panel2); border:1px solid var(--line); border-radius:12px}
+  .slotdrop{flex:1; display:flex; align-items:center; padding:10px 12px; border-radius:12px;
+            border:1.5px dashed var(--line); background:rgba(19,26,44,.4); color:var(--muted);
+            font-size:14px; line-height:1.4; transition:.15s; cursor:pointer; min-height:58px}
+  .slotdrop.filled{border-style:solid; background:var(--panel2); color:var(--ink); cursor:pointer}
+  .slotdrop.filled:hover{border-color:#3a4a6a}
+  .slotdrop.wrong{border-color:var(--bad); background:rgba(255,90,90,.12); animation:shake .35s}
+  .slotdrop.right{border-color:var(--ok); background:rgba(87,211,140,.12)}
+  .slotdrop .rm{margin-left:auto; flex:0 0 auto; color:var(--muted); font-size:18px; padding-left:8px}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+  .tray{display:flex; flex-wrap:wrap; gap:10px; margin-bottom:6px}
+  .pcard{flex:1 1 46%; min-width:0; text-align:left; padding:13px 14px; border-radius:12px;
+         border:1px solid var(--line); background:var(--panel2); color:var(--ink);
+         font-size:14px; line-height:1.4; cursor:pointer; transition:.15s}
+  .pcard:hover{border-color:#3a4a6a}
+  .pcard:active{transform:translateY(1px)}
+  .pcard.used{opacity:.35; pointer-events:none}
+  .trayhint{font-size:12px; color:var(--muted); margin:2px 0 10px}
+</style>
+</head>
+<body>
+  <header>
+    <div class="htitle"><h1 id="title">发动机流水线</h1><span class="en" id="titleEn">Engine Pipeline</span></div>
+    <div class="headright">
+      <a class="backlink" href="../index.html" id="back">← 目录</a>
+      <span class="langtoggle" id="langBtn">EN</span>
+    </div>
+  </header>
+
+  <p class="hook" id="hook"></p>
+
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="q" id="q"></div>
+    <div class="slots" id="slots"></div>
+    <div class="trayhint" id="trayhint"></div>
+    <div class="tray" id="tray"></div>
+    <div class="feedback" id="feedback"></div>
+    <div class="buttons">
+      <button class="fire" id="checkBtn"></button>
+      <button class="ghost" id="resetBtn"></button>
+    </div>
+  </div>
+
+  <div class="badge" id="badge">
+    <span class="medal">🏅</span>
+    <span id="badgeText"></span>
+  </div>
+
+<script>
+(() => {
+  // ============ i18n ============
+  // Card IDENTITY is the step number (1..5). Display text lives in T so it swaps with language.
+  // The correct final order of identities is [1,2,3,4,5].
+  const T = {
+    zh: {
+      title:'发动机流水线', titleEn:'Engine Pipeline', lang:'EN', back:'← 目录',
+      hook:'马斯克：<b>发动机是火箭的心脏。把这条流水线排对。</b> 五张卡片顺序被打乱了，点卡片放进 ①②③④⑤，再按检查。',
+      q:'把发动机点火到喷气的 <b>5 个步骤</b> 按正确顺序排好：',
+      trayhint:'点下面的卡片，依次放进上面的编号槽 ①→⑤：',
+      check:'检查', reset:'重来',
+      steps:{
+        1:'涡轮泵把燃料和液氧送进燃烧室',
+        2:'点火，产生高温高压气体',
+        3:'气体挤过喷管最窄处（喉部）达到音速',
+        4:'张开段膨胀加速到超音速喷出',
+        5:'反作用力推动火箭'
+      },
+      needFill:'还有空槽没放满，先把 ①→⑤ 都填上。',
+      wrongPrefix:'第',
+      wrongMid:'步不对：',
+      wrongMsgs:{
+        1:'第一步应该是<b>涡轮泵先送燃料和液氧进燃烧室</b>——没燃料，点什么火？',
+        2:'燃料进来后才<b>点火</b>，产生高温高压气体。',
+        3:'气体得先<b>挤过喉部到音速</b>，才能继续加速。',
+        4:'到了音速，才在<b>张开段膨胀到超音速喷出</b>。',
+        5:'气体喷出去，火箭才靠<b>反作用力</b>被推走。'
+      },
+      boom:'顺序不对，气体还没提速就出门了。炸了？又一份数据。',
+      verdictBadTag:'顺序错误',
+      verdictOkTag:'点火成功 🔥',
+      verdictOk:'完美！燃料→点火→喉部→张开段→喷出→推力，一气呵成。看气流跑一遍。',
+      verdictBad:'看第一个红色槽——那一步放错了。',
+      badgeLocked:'徽章未解锁：把流水线排对一次，即可获得「发动机医生」。',
+      badgeEarned:'已获得徽章「发动机医生」——你让这颗心脏跳起来了。'
+    },
+    en: {
+      title:'Engine Pipeline', titleEn:'发动机流水线', lang:'中', back:'← Menu',
+      hook:'Musk: <b>The engine is the heart of a rocket. Get this pipeline in order.</b> Five cards are shuffled — tap to fill ①②③④⑤, then Check.',
+      q:'Put the <b>5 steps</b> from ignition to exhaust in the right order:',
+      trayhint:'Tap a card below to drop it into the next numbered slot ①→⑤:',
+      check:'Check', reset:'Reset',
+      steps:{
+        1:'Turbopump feeds fuel + liquid oxygen into the combustion chamber',
+        2:'Ignite — creating hot, high-pressure gas',
+        3:'Gas squeezes through the nozzle\'s narrowest point (throat) to reach the speed of sound',
+        4:'The diverging bell expands it to supersonic speed and it shoots out',
+        5:'Reaction force pushes the rocket'
+      },
+      needFill:'Some slots are still empty — fill ①→⑤ first.',
+      wrongPrefix:'Slot ',
+      wrongMid:' is wrong: ',
+      wrongMsgs:{
+        1:'Step 1 must be the <b>turbopump feeding fuel + LOX into the chamber</b> — no fuel, nothing to ignite.',
+        2:'Only after fuel arrives do you <b>ignite</b> to make hot, high-pressure gas.',
+        3:'The gas must first <b>squeeze through the throat to the speed of sound</b>.',
+        4:'Once at Mach 1, the <b>diverging bell expands it to supersonic</b> and out it goes.',
+        5:'Only when gas shoots out does <b>reaction force</b> push the rocket.'
+      },
+      boom:'Order\'s wrong — the gas left before it sped up. Boom? Another data point.',
+      verdictBadTag:'Wrong order',
+      verdictOkTag:'Ignition 🔥',
+      verdictOk:'Perfect! fuel → ignite → throat → bell → exhaust → thrust, all in one go. Watch the flow.',
+      verdictBad:'Look at the first red slot — that step is misplaced.',
+      badgeLocked:'Badge locked: order the pipeline correctly once to earn "Engine Doctor".',
+      badgeEarned:'Badge earned: "Engine Doctor" — you got this heart beating.'
+    }
+  };
+  const CORRECT = [1,2,3,4,5];
+  let lang = 'zh';
+
+  // ============ DOM ============
+  const slotsEl   = document.getElementById('slots');
+  const trayEl    = document.getElementById('tray');
+  const feedbackEl= document.getElementById('feedback');
+  const checkBtn  = document.getElementById('checkBtn');
+  const resetBtn  = document.getElementById('resetBtn');
+  const verdictEl = document.getElementById('verdict');
+  const badgeEl   = document.getElementById('badge');
+  const badgeText = document.getElementById('badgeText');
+  const canvas    = document.getElementById('c');
+  const ctx       = canvas.getContext('2d');
+
+  // ============ state ============
+  let trayOrder = [];     // identities in the tray (shuffled), each {id, used}
+  let placed = [];        // length-5 array of identity ids or null (index = slot 0..4)
+  let solved = false;
+  let anim = null;        // success flight animation
+
+  function shuffle(a){
+    a = a.slice();
+    for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+    return a;
+  }
+  function isTrivial(order){
+    return order.every((v,i)=>v===CORRECT[i]);
+  }
+  function newPuzzle(){
+    let order = shuffle(CORRECT);
+    while(isTrivial(order)) order = shuffle(CORRECT); // never hand them the answer
+    trayOrder = order.map(id=>({id, used:false}));
+    placed = [null,null,null,null,null];
+    solved = false;
+    anim = null;
+    feedbackEl.innerHTML = '';
+    hideVerdict();
+    draw();
+    render();
+  }
+
+  // ============ render card UI ============
+  function render(){
+    const t = T[lang];
+    // slots
+    slotsEl.innerHTML = '';
+    const nums = ['①','②','③','④','⑤'];
+    placed.forEach((id, i)=>{
+      const row = document.createElement('div'); row.className='slot';
+      const num = document.createElement('div'); num.className='slotnum'; num.textContent=nums[i];
+      const drop = document.createElement('div'); drop.className='slotdrop'; drop.dataset.slot=i;
+      if(id!=null){
+        drop.classList.add('filled');
+        drop.innerHTML = `<span>${t.steps[id]}</span><span class="rm">✕</span>`;
+        drop.addEventListener('click', ()=>removeFromSlot(i));
+      } else {
+        drop.textContent = lang==='zh' ? '（空槽，点下面卡片放入）' : '(empty — tap a card below)';
+      }
+      row.appendChild(num); row.appendChild(drop);
+      slotsEl.appendChild(row);
+    });
+    // tray
+    trayEl.innerHTML = '';
+    trayOrder.forEach((cardObj)=>{
+      const b = document.createElement('div');
+      b.className = 'pcard' + (cardObj.used?' used':'');
+      b.textContent = t.steps[cardObj.id];
+      b.addEventListener('click', ()=>placeCard(cardObj));
+      trayEl.appendChild(b);
+    });
+  }
+
+  function firstEmptySlot(){ return placed.indexOf(null); }
+
+  function placeCard(cardObj){
+    if(solved || cardObj.used) return;
+    const slot = firstEmptySlot();
+    if(slot<0) return;
+    placed[slot] = cardObj.id;
+    cardObj.used = true;
+    feedbackEl.innerHTML = '';
+    hideVerdict();
+    render();
+  }
+  function removeFromSlot(i){
+    if(solved) return;
+    const id = placed[i];
+    if(id==null) return;
+    placed[i] = null;
+    const cardObj = trayOrder.find(c=>c.id===id);
+    if(cardObj) cardObj.used = false;
+    feedbackEl.innerHTML = '';
+    hideVerdict();
+    render();
+  }
+
+  // ============ check ============
+  function check(){
+    if(solved) return;
+    const t = T[lang];
+    if(placed.indexOf(null)>=0){
+      feedbackEl.innerHTML = t.needFill;
+      return;
+    }
+    // find first wrong slot
+    let wrong = -1;
+    for(let i=0;i<5;i++){ if(placed[i]!==CORRECT[i]){ wrong=i; break; } }
+    // clear prior highlights
+    [...slotsEl.querySelectorAll('.slotdrop')].forEach(d=>{ d.classList.remove('wrong','right'); });
+    if(wrong<0){
+      // correct!
+      [...slotsEl.querySelectorAll('.slotdrop')].forEach(d=>d.classList.add('right'));
+      solved = true;
+      feedbackEl.innerHTML = '<b>'+t.verdictOk+'</b>';
+      showVerdict(true);
+      awardBadge();
+      startFlight();
+    } else {
+      const drops = slotsEl.querySelectorAll('.slotdrop');
+      drops[wrong].classList.add('wrong');
+      const correctId = CORRECT[wrong];
+      feedbackEl.innerHTML =
+        t.wrongPrefix + (wrong+1) + t.wrongMid + t.wrongMsgs[correctId] +
+        '<br><b>' + t.boom + '</b>';
+      showVerdict(false);
+    }
+  }
+
+  // ============ verdict card ============
+  function showVerdict(ok){
+    const t = T[lang];
+    verdictEl.className = 'verdict show ' + (ok?'ok':'bad');
+    const tag = ok ? t.verdictOkTag : t.verdictBadTag;
+    const body = ok ? t.verdictOk : t.verdictBad;
+    verdictEl.innerHTML = `<span class="tag">${tag}</span>${body}`;
+  }
+  function hideVerdict(){ verdictEl.className='verdict'; }
+
+  // ============ badge ============
+  function awardBadge(){
+    try{ localStorage.setItem('mg.badge.engine-pipeline','1'); }catch(e){}
+    renderBadge();
+  }
+  function isEarned(){
+    try{ return localStorage.getItem('mg.badge.engine-pipeline')==='1'; }catch(e){ return false; }
+  }
+  function renderBadge(){
+    const earned = isEarned();
+    badgeEl.className = 'badge' + (earned?' earned':'');
+    badgeText.textContent = earned ? T[lang].badgeEarned : T[lang].badgeLocked;
+  }
+
+  // ============ canvas: engine cross-section + gas flow ============
+  let W=0,H=0,dpr=1;
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = W*dpr; canvas.height = H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+
+  // Engine geometry, in canvas coords, computed from W,H.
+  // Layout left→right: turbopump feed → combustion chamber → throat → diverging bell → plume.
+  function geom(){
+    const midY = H*0.5;
+    const cxL  = W*0.16;              // pump feed x
+    const chamL= W*0.24;             // chamber left
+    const chamR= W*0.46;             // chamber right (start converging)
+    const throatX = W*0.55;          // throat
+    const bellR = W*0.82;            // bell exit
+    const chamberH = H*0.30;         // chamber half-height*2
+    const throatH = H*0.085;         // throat half-gap
+    const bellH   = H*0.30;          // bell exit half-gap
+    return {midY,cxL,chamL,chamR,throatX,bellR,chamberH,throatH,bellH};
+  }
+  // half-height of the engine channel at a given x (converging-diverging profile)
+  function chanHalf(x,g){
+    if(x <= g.chamR){ return g.chamberH/2; }
+    if(x <= g.throatX){
+      const f=(x-g.chamR)/(g.throatX-g.chamR); // 0..1
+      return g.chamberH/2 + (g.throatH - g.chamberH/2)*ease(f);
+    }
+    if(x <= g.bellR){
+      const f=(x-g.throatX)/(g.bellR-g.throatX);
+      return g.throatH + (g.bellH - g.throatH)*ease(f);
+    }
+    return g.bellH;
+  }
+  function ease(t){ return t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; }
+
+  function drawEngineWalls(g){
+    // upper + lower nozzle walls from chamber start to bell exit
+    const N=60;
+    ctx.lineWidth=5; ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.strokeStyle='#c7ccd3';
+    // upper wall
+    ctx.beginPath();
+    for(let i=0;i<=N;i++){
+      const x=g.chamL + (g.bellR-g.chamL)*i/N;
+      const y=g.midY - chanHalf(x,g);
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    }
+    ctx.stroke();
+    // lower wall
+    ctx.beginPath();
+    for(let i=0;i<=N;i++){
+      const x=g.chamL + (g.bellR-g.chamL)*i/N;
+      const y=g.midY + chanHalf(x,g);
+      i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+    }
+    ctx.stroke();
+    // chamber back wall (left cap)
+    ctx.beginPath();
+    ctx.moveTo(g.chamL, g.midY-g.chamberH/2);
+    ctx.lineTo(g.chamL, g.midY+g.chamberH/2);
+    ctx.stroke();
+  }
+
+  function drawPumpFeed(g, t){
+    // turbopump: a gear-ish circle feeding two pipes into chamber back
+    const px=g.cxL, py=g.midY, r=Math.max(14, W*0.05);
+    // pipes
+    ctx.strokeStyle='#8ba0b4'; ctx.lineWidth=7; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(px+r*0.6, py-r*0.5); ctx.lineTo(g.chamL, g.midY-g.chamberH*0.28); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(px+r*0.6, py+r*0.5); ctx.lineTo(g.chamL, g.midY+g.chamberH*0.28); ctx.stroke();
+    // pump body
+    ctx.fillStyle='#3a4560'; ctx.strokeStyle='#c7ccd3'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(px,py,r,0,7); ctx.fill(); ctx.stroke();
+    // spinning rotor
+    ctx.save(); ctx.translate(px,py); ctx.rotate(t*4);
+    ctx.strokeStyle='#ffd27f'; ctx.lineWidth=3;
+    for(let k=0;k<6;k++){ ctx.rotate(Math.PI/3); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(r*0.72,0); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle='#0d1220'; ctx.beginPath(); ctx.arc(px,py,r*0.16,0,7); ctx.fill();
+    // fuel/LOX labels (tiny dots color)
+    ctx.fillStyle='#4aa3ff'; ctx.beginPath(); ctx.arc(px-r*0.4, py-r*0.8, 3.5,0,7); ctx.fill();
+    ctx.fillStyle='#ff8c42'; ctx.beginPath(); ctx.arc(px-r*0.4, py+r*0.8, 3.5,0,7); ctx.fill();
+  }
+
+  // gas particles flow from chamber through throat and out the bell
+  let parts=[];
+  function seedParts(g){
+    parts=[];
+    for(let i=0;i<90;i++){
+      parts.push(newPart(g, Math.random()));
+    }
+  }
+  function newPart(g, startFrac){
+    const x = g.chamL + (g.chamR-g.chamL)*startFrac*0.9;
+    const half = chanHalf(x,g)*0.82;
+    return { x, y: g.midY + (Math.random()*2-1)*half, seed:Math.random() };
+  }
+  function speedAt(x,g){
+    // gas accelerates: slow in chamber, fast after throat (real trend)
+    if(x<=g.throatX){ return 0.6 + 1.4*((x-g.chamL)/(g.throatX-g.chamL)); }
+    const f=(x-g.throatX)/(g.bellR-g.throatX);
+    return 2.0 + 4.5*f;
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // bg
+    ctx.fillStyle='#03040a'; ctx.fillRect(0,0,W,H);
+    const g = geom();
+    if(parts.length===0) seedParts(g);
+    const t = (anim? anim.t : 0);
+
+    // chamber glow when running
+    if(anim){
+      const glowA = 0.35 + 0.25*Math.sin(t*8);
+      const gr = ctx.createRadialGradient((g.chamL+g.chamR)/2, g.midY, 4, (g.chamL+g.chamR)/2, g.midY, g.chamberH);
+      gr.addColorStop(0, `rgba(255,220,150,${glowA})`);
+      gr.addColorStop(0.5, `rgba(255,140,66,${glowA*0.6})`);
+      gr.addColorStop(1, 'rgba(255,140,66,0)');
+      ctx.fillStyle=gr;
+      ctx.fillRect(g.chamL-10, g.midY-g.chamberH, (g.chamR-g.chamL)+40, g.chamberH*2);
+    }
+
+    // clip channel and draw gas particles inside
+    ctx.save();
+    ctx.beginPath();
+    const N=60;
+    ctx.moveTo(g.chamL, g.midY-g.chamberH/2);
+    for(let i=0;i<=N;i++){ const x=g.chamL+(g.bellR-g.chamL)*i/N; ctx.lineTo(x, g.midY-chanHalf(x,g)); }
+    for(let i=N;i>=0;i--){ const x=g.chamL+(g.bellR-g.chamL)*i/N; ctx.lineTo(x, g.midY+chanHalf(x,g)); }
+    ctx.closePath();
+    ctx.clip();
+
+    if(anim){
+      for(const p of parts){
+        // color shifts hot→cool as it accelerates out
+        const sp = speedAt(p.x,g);
+        const hot = Math.max(0, 1 - (p.x-g.throatX)/(g.bellR-g.throatX));
+        const col = p.x < g.throatX
+          ? `rgba(255,${200-80*(p.x-g.chamL)/(g.throatX-g.chamL)},120,0.9)`
+          : `rgba(${180+70*hot},${210},255,0.85)`;
+        ctx.fillStyle = col;
+        const rr = 2.2 + 2.0*(sp/6);
+        ctx.beginPath(); ctx.arc(p.x, p.y, rr, 0, 7); ctx.fill();
+      }
+    }
+    ctx.restore();
+
+    drawEngineWalls(g);
+    drawPumpFeed(g, t);
+
+    // exhaust plume beyond bell when running
+    if(anim){
+      const ex = g.bellR, ey=g.midY;
+      const plumeLen = W*0.16 * (0.7+0.3*Math.sin(t*10));
+      const pg = ctx.createLinearGradient(ex,ey, ex+plumeLen, ey);
+      pg.addColorStop(0, 'rgba(180,220,255,0.9)');
+      pg.addColorStop(0.4,'rgba(120,180,255,0.5)');
+      pg.addColorStop(1, 'rgba(120,180,255,0)');
+      ctx.fillStyle=pg;
+      ctx.beginPath();
+      ctx.moveTo(ex, ey-g.bellH);
+      ctx.lineTo(ex+plumeLen, ey-g.bellH*0.4);
+      ctx.lineTo(ex+plumeLen, ey+g.bellH*0.4);
+      ctx.lineTo(ex, ey+g.bellH);
+      ctx.closePath(); ctx.fill();
+      // shock diamonds
+      ctx.fillStyle='rgba(255,255,255,0.55)';
+      for(let d=0; d<3; d++){
+        const dx = ex + plumeLen*(0.18+0.28*d);
+        const dh = g.bellH*0.5*(1-0.2*d);
+        ctx.beginPath();
+        ctx.moveTo(dx-6, ey); ctx.lineTo(dx, ey-dh*0.35); ctx.lineTo(dx+6, ey); ctx.lineTo(dx, ey+dh*0.35);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    // stage labels
+    ctx.fillStyle='rgba(139,160,180,.85)'; ctx.font=`${Math.max(9,W*0.024)}px -apple-system,sans-serif`;
+    ctx.textAlign='center';
+    const lb = lang==='zh'
+      ? ['涡轮泵','燃烧室','喉部','张开段','喷出']
+      : ['Pump','Chamber','Throat','Bell','Exhaust'];
+    ctx.fillText(lb[0], g.cxL, g.midY - Math.max(18,W*0.05) - 8);
+    ctx.fillText(lb[1], (g.chamL+g.chamR)/2, g.midY - g.chamberH/2 - 8);
+    ctx.fillText(lb[2], g.throatX, g.midY + g.throatH + 16);
+    ctx.fillText(lb[3], (g.throatX+g.bellR)/2, g.midY - g.bellH*0.7 - 4);
+    ctx.fillText(lb[4], g.bellR + W*0.06, g.midY - g.bellH - 2);
+    ctx.textAlign='start';
+  }
+
+  // ============ success flight animation ============
+  function startFlight(){
+    const g = geom();
+    seedParts(g);
+    anim = { t:0, start:performance.now() };
+    checkBtn.disabled = true; resetBtn.disabled = false;
+    function tick(now){
+      if(!anim) return;
+      anim.t = (now - anim.start)/1000;
+      const g = geom();
+      // advance particles
+      for(const p of parts){
+        p.x += speedAt(p.x,g) * (W*0.0016);
+        // keep inside channel vertically as it widens/narrows
+        const half = chanHalf(p.x,g)*0.86;
+        if(Math.abs(p.y-g.midY) > half){ p.y = g.midY + Math.sign(p.y-g.midY)*half; }
+        if(p.x > g.bellR + W*0.02){ // respawn at chamber
+          const np = newPart(g, Math.random());
+          p.x=np.x; p.y=np.y;
+        }
+      }
+      draw();
+      // run ~5s of watchable flow, then keep looping gently
+      if(anim.t < 5.2){ requestAnimationFrame(tick); }
+      else { requestAnimationFrame(tick); } // keep it running so the kid can watch
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ============ static text ============
+  function renderStatic(){
+    const t=T[lang];
+    document.getElementById('title').textContent = t.title;
+    document.getElementById('titleEn').textContent = t.titleEn;
+    document.getElementById('langBtn').textContent = t.lang;
+    document.getElementById('back').textContent = t.back;
+    document.getElementById('hook').innerHTML = t.hook;
+    document.getElementById('q').innerHTML = t.q;
+    document.getElementById('trayhint').textContent = t.trayhint;
+    checkBtn.textContent = t.check;
+    resetBtn.textContent = t.reset;
+    document.documentElement.lang = lang;
+  }
+
+  // ============ events ============
+  checkBtn.addEventListener('click', check);
+  resetBtn.addEventListener('click', newPuzzle);
+  document.getElementById('langBtn').addEventListener('click', ()=>{
+    lang = lang==='zh'?'en':'zh';
+    renderStatic(); render(); renderBadge();
+    // re-show verdict text in new language if visible
+    if(verdictEl.classList.contains('show')){
+      showVerdict(verdictEl.classList.contains('ok'));
+    }
+    draw();
+  });
+  window.addEventListener('resize', resize);
+
+  // ============ init ============
+  renderStatic();
+  renderBadge();
+  newPuzzle();
+  resize();
+})();
+</script>
+</body>
+</html>

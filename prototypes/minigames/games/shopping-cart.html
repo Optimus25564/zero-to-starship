@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>购物车赛跑 · Shopping Cart Race</title>
+<link rel="stylesheet" href="../common.css">
+</head>
+<body>
+  <header>
+    <div class="htitle"><h1 id="title">购物车赛跑</h1><span class="en" id="titleEn">Shopping Cart Race</span></div>
+    <div class="headright">
+      <a class="backlink" href="../index.html" id="back">← 目录</a>
+      <span class="langtoggle" id="langBtn">EN</span>
+    </div>
+  </header>
+
+  <p class="hook" id="hook"></p>
+
+  <div class="stage wide">
+    <canvas id="c"></canvas>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="meters">
+      <div class="meter">
+        <div class="mlabel"><span id="cartAlbl">空车 10 kg</span><span id="cartAspd">0.0 m/s</span></div>
+        <div class="mbar"><div class="mfill ok" id="cartAfill" style="width:0%"></div></div>
+      </div>
+      <div class="meter">
+        <div class="mlabel"><span id="cartBlbl">满车 100 kg</span><span id="cartBspd">0.0 m/s</span></div>
+        <div class="mbar"><div class="mfill bad" id="cartBfill" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="analogy" id="analogy"></div>
+    <div class="buttons">
+      <button class="fire" id="pushBtn">按住推 →</button>
+      <button class="ghost" id="resetBtn">重来</button>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="quizPanel">
+    <p class="q" id="q"></p>
+    <div class="choices" id="choices"></div>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <div class="badge" id="badge">
+    <span class="medal">🏅</span>
+    <span id="badgeText"></span>
+  </div>
+
+<script>
+(() => {
+  // ---------- real physics: same force F on both carts, a=F/m ----------
+  const F=200;        // N, identical push on both
+  const M_LIGHT=10;   // kg
+  const M_HEAVY=100;  // kg
+  const TRACK=14;     // metres to the finish
+
+  const T={
+    zh:{
+      title:'购物车赛跑', titleEn:'Shopping Cart Race', lang:'EN', back:'← 目录',
+      hook:'马斯克：同样的力，越轻的加速越快。空车好推，满车难推——这就是 <b>F = m·a</b>。按住"推"，两辆车吃到<b>一模一样</b>的力，看谁先到终点。',
+      cartA:'空车 10 kg', cartB:'满车 100 kg', push:'按住推 →', reset:'重来',
+      analogy:(a1,a2)=>`同样 <b>${F} N</b> 的力：空车加速度 <b>a=F/m=${a1.toFixed(1)}</b> m/s²，满车只有 <b>${a2.toFixed(1)}</b> m/s²。轻 10 倍，就快 10 倍。`,
+      winLine:'空车冲线！轻的赢了。现在想想下面这题——',
+      q:'想让<b>满车</b>和空车一样快到终点，怎么办？（这题有<b>两个</b>正确答案）',
+      cA:'用 <b>10 倍</b>的力推满车（力也变 10 倍）', cB:'把满车 <b>90%</b> 的货扔掉（车变轻 10 倍）',
+      fb:'<b>两个都对！</b>a=F/m：要么把 F 变大，要么把 m 变小，加速度就一样。但在火箭上"加 10 倍推力"意味着<b>更重更贵的发动机</b>……所以 SpaceX 更爱答案 B——<b>减重</b>。第 10 关它会救你的命。',
+      badgeLocked:'徽章未解锁：跑完比赛并答题，即可获得「F=ma 驾驶员」。',
+      badgeEarned:'已获得徽章「F=ma 驾驶员」——同样的力，越轻加速越快。要更快：加力，或减重。'
+    },
+    en:{
+      title:'Shopping Cart Race', titleEn:'购物车赛跑', lang:'中', back:'← Menu',
+      hook:'Musk: same force, the lighter one accelerates faster. Empty cart is easy, full cart is hard — that\'s <b>F = m·a</b>. Hold "push" and both carts get the <b>exact same</b> force. Who reaches the finish first?',
+      cartA:'Empty 10 kg', cartB:'Full 100 kg', push:'Hold to push →', reset:'Reset',
+      analogy:(a1,a2)=>`Same <b>${F} N</b> force: empty cart a=F/m=<b>${a1.toFixed(1)}</b> m/s², full cart only <b>${a2.toFixed(1)}</b> m/s². 10× lighter, 10× faster.`,
+      winLine:'Empty cart wins! The light one crossed first. Now this question —',
+      q:'To make the <b>full cart</b> reach the finish as fast as the empty one, what works? (This one has <b>two</b> right answers.)',
+      cA:'Push the full cart with <b>10× the force</b> (F ×10)', cB:'Dump <b>90%</b> of the cargo (m ÷10, cart gets lighter)',
+      fb:'<b>Both are right!</b> a=F/m: raise F, or lower m — either gives the same acceleration. But on a rocket, "10× the thrust" means <b>heavier, pricier engines</b>… so SpaceX prefers answer B — <b>cut mass</b>. In Level 10 it\'ll save your life.',
+      badgeLocked:'Badge locked: finish the race and answer the question to earn "F=ma Driver".',
+      badgeEarned:'Badge earned: "F=ma Driver" — same force, lighter accelerates faster. To go faster: more force, or less mass.'
+    }
+  };
+  let lang='zh';
+
+  const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+  const verdictEl=document.getElementById('verdict');
+  const badgeEl=document.getElementById('badge'), badgeText=document.getElementById('badgeText');
+  const pushBtn=document.getElementById('pushBtn'), resetBtn=document.getElementById('resetBtn');
+  const analogyEl=document.getElementById('analogy');
+  const quizPanel=document.getElementById('quizPanel'), choicesEl=document.getElementById('choices'), feedbackEl=document.getElementById('feedback');
+  const fillA=document.getElementById('cartAfill'), fillB=document.getElementById('cartBfill');
+  const spdA=document.getElementById('cartAspd'), spdB=document.getElementById('cartBspd');
+
+  let W=0,H=0,dpr=1;
+  function resize(){
+    const rect=canvas.getBoundingClientRect();
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    W=rect.width; H=rect.height;
+    canvas.width=W*dpr; canvas.height=H*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    draw();
+  }
+
+  // ---------- state ----------
+  let xA=0,vA=0,xB=0,vB=0;        // metres, m/s
+  let pushing=false, raceDone=false, answered=false, quizShown=false;
+  let lastT=0, running=false;
+
+  function reset(){
+    xA=0;vA=0;xB=0;vB=0; pushing=false; raceDone=false; answered=false; quizShown=false;
+    quizPanel.classList.add('hidden'); feedbackEl.innerHTML=''; hideVerdict();
+    pushBtn.disabled=false;
+    if(!running){ running=true; lastT=0; requestAnimationFrame(loop); }
+    renderReadout(); draw();
+  }
+
+  function loop(now){
+    if(!lastT) lastT=now;
+    const dt=Math.min(0.03,(now-lastT)/1000); lastT=now;
+    if(!raceDone && pushing){
+      const aA=F/M_LIGHT, aB=F/M_HEAVY;
+      vA+=aA*dt; xA+=vA*dt;
+      vB+=aB*dt; xB+=vB*dt;
+      if(xA>=TRACK){ xA=TRACK; finishRace(); }
+    }
+    renderReadout(); draw();
+    if(running) requestAnimationFrame(loop);
+  }
+
+  function finishRace(){
+    raceDone=true; pushing=false; pushBtn.disabled=true;
+    showVerdict();
+    if(!quizShown){ quizShown=true; buildQuiz(); quizPanel.classList.remove('hidden'); }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // background
+    ctx.fillStyle='#0a1224'; ctx.fillRect(0,0,W,H);
+    const laneH=H/2;
+    const finishX=W*0.9;
+    for(let i=0;i<2;i++){
+      const cy=laneH*i+laneH*0.5;
+      // lane
+      ctx.fillStyle=i? 'rgba(255,90,90,.05)':'rgba(87,211,140,.05)';
+      ctx.fillRect(0,laneH*i,W,laneH);
+      ctx.strokeStyle='#26304a'; ctx.beginPath(); ctx.moveTo(0,laneH*i); ctx.lineTo(W,laneH*i); ctx.stroke();
+      // finish line
+      ctx.strokeStyle='#ffd27f'; ctx.setLineDash([6,6]); ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(finishX,laneH*i+8); ctx.lineTo(finishX,laneH*(i+1)-8); ctx.stroke(); ctx.setLineDash([]);
+    }
+    const startX=W*0.06;
+    drawCart(startX+(finishX-startX)*(xA/TRACK), laneH*0.5, false);
+    drawCart(startX+(finishX-startX)*(xB/TRACK), laneH*1.5, true);
+    // labels
+    ctx.font='12px sans-serif'; ctx.textAlign='left';
+    ctx.fillStyle='#57d38c'; ctx.fillText(lang==='zh'?'空车 10 kg':'Empty 10 kg', 10, 18);
+    ctx.fillStyle='#ff9b9b'; ctx.fillText(lang==='zh'?'满车 100 kg':'Full 100 kg', 10, laneH+18);
+  }
+
+  function drawCart(cx,cy,full){
+    ctx.save(); ctx.translate(cx,cy);
+    // basket
+    ctx.strokeStyle=full?'#ff9b9b':'#9fe6bf'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(-18,-10); ctx.lineTo(18,-10); ctx.lineTo(14,8); ctx.lineTo(-14,8); ctx.closePath(); ctx.stroke();
+    // handle
+    ctx.beginPath(); ctx.moveTo(-18,-10); ctx.lineTo(-26,-18); ctx.stroke();
+    // cargo
+    if(full){ ctx.fillStyle='rgba(255,155,155,.6)'; ctx.fillRect(-13,-9,26,15); }
+    // wheels
+    ctx.fillStyle='#c7ccd3'; ctx.beginPath(); ctx.arc(-10,12,4,0,7); ctx.arc(10,12,4,0,7); ctx.fill();
+    ctx.restore();
+  }
+
+  function buildQuiz(){
+    const t=T[lang];
+    choicesEl.innerHTML='';
+    [['A',t.cA],['B',t.cB]].forEach(([k,txt])=>{
+      const b=document.createElement('button'); b.className='choice';
+      b.innerHTML=`<span class="key">${k}</span><span>${txt}</span>`;
+      b.addEventListener('click',()=>answer());
+      choicesEl.appendChild(b);
+    });
+    document.getElementById('q').innerHTML=t.q;
+  }
+
+  function answer(){
+    if(answered) return; answered=true;
+    // double-correct design: both light up green
+    [...choicesEl.children].forEach(b=>{ b.classList.add('correct'); });
+    feedbackEl.innerHTML=T[lang].fb;
+    try{ localStorage.setItem('mg.badge.shopping-cart','1'); }catch(e){}
+    renderBadge();
+  }
+
+  function renderReadout(){
+    fillA.style.width=(xA/TRACK*100)+'%';
+    fillB.style.width=(xB/TRACK*100)+'%';
+    spdA.textContent=vA.toFixed(1)+' m/s';
+    spdB.textContent=vB.toFixed(1)+' m/s';
+    analogyEl.innerHTML=T[lang].analogy(F/M_LIGHT, F/M_HEAVY);
+  }
+  function showVerdict(){
+    verdictEl.className='verdict show ok';
+    verdictEl.innerHTML=`<span class="tag">🏁</span>${T[lang].winLine}`;
+  }
+  function hideVerdict(){ verdictEl.className='verdict'; }
+  function renderBadge(){
+    const earned=(()=>{ try{ return localStorage.getItem('mg.badge.shopping-cart')==='1'; }catch(e){ return false; } })();
+    badgeEl.className='badge'+(earned?' earned':'');
+    badgeText.textContent=earned?T[lang].badgeEarned:T[lang].badgeLocked;
+  }
+  function renderStatic(){
+    const t=T[lang];
+    document.getElementById('title').textContent=t.title;
+    document.getElementById('titleEn').textContent=t.titleEn;
+    document.getElementById('langBtn').textContent=t.lang;
+    document.getElementById('back').textContent=t.back;
+    document.getElementById('hook').innerHTML=t.hook;
+    document.getElementById('cartAlbl').textContent=t.cartA;
+    document.getElementById('cartBlbl').textContent=t.cartB;
+    pushBtn.textContent=t.push; resetBtn.textContent=t.reset;
+    if(quizShown){ document.getElementById('q').innerHTML=t.q; buildQuizRelabel(); if(answered) feedbackEl.innerHTML=t.fb; }
+    document.documentElement.lang=lang;
+  }
+  function buildQuizRelabel(){
+    const t=T[lang]; const kids=[...choicesEl.children]; const txts=[t.cA,t.cB];
+    kids.forEach((b,i)=>{ b.querySelector('span:last-child').innerHTML=txts[i]; });
+  }
+
+  // hold-to-push (pointer + touch)
+  const startPush=(e)=>{ e.preventDefault(); if(!raceDone) pushing=true; };
+  const endPush=(e)=>{ e.preventDefault(); pushing=false; };
+  pushBtn.addEventListener('pointerdown',startPush);
+  pushBtn.addEventListener('pointerup',endPush);
+  pushBtn.addEventListener('pointerleave',endPush);
+  pushBtn.addEventListener('pointercancel',endPush);
+  resetBtn.addEventListener('click',reset);
+  document.getElementById('langBtn').addEventListener('click',()=>{
+    lang=lang==='zh'?'en':'zh'; renderStatic(); renderReadout(); if(raceDone) showVerdict(); renderBadge(); draw();
+  });
+  window.addEventListener('resize',resize);
+
+  renderStatic(); renderReadout(); renderBadge(); resize(); reset();
+})();
+</script>
+</body>
+</html>
