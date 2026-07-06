@@ -110,9 +110,8 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .finale-credit { margin-top: 30px; color: #fff3e2; font-weight: 400; opacity: .96; transform: rotate(-1.5deg);
   font-family: "Snell Roundhand", "Bradley Hand", "Segoe Script", "Comic Sans MS", cursive;
   font-size: clamp(18px, 2.8vw, 28px); text-shadow: 0 2px 9px rgba(0,0,0,.45); }
-.finale-back { margin-top: 20px; padding: 8px 18px; border: 1px solid rgba(255,255,255,.5); border-radius: 16px;
-  background: rgba(0,0,0,.18); color: #fff6e8; font-size: 13px; cursor: pointer; }
-.finale-back:hover { background: rgba(0,0,0,.34); }
+.finale-end { margin-top: 30px; color: #fff6e8; opacity: .92; letter-spacing: 4px;
+  font-size: clamp(18px, 2.6vw, 26px); text-shadow: 0 2px 10px rgba(0,0,0,.5); }
 
 /* ============ 手机 / 窄屏适配 ============ */
 /* 目标：文案(顶部 hook + 底部控制面板)压扁到上下两条，中间留出一整条给 3D 动画，不挡住火箭。 */

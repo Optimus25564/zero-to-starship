@@ -32,13 +32,9 @@ export function startGame(mount) {
         <figure class="finale-piece"><div class="finale-frame"><img src="${spaceDrawingUrl}" alt="In space, drawn by Amie" /></div><figcaption></figcaption></figure>
         <figure class="finale-piece"><div class="finale-frame"><img src="${marsDrawingUrl}" alt="On Mars, drawn by Amie" /></div><figcaption></figcaption></figure>
       </div>
-      <button class="finale-back"></button>
+      <div class="finale-end"></div>
     </div>`
   mount.appendChild(finaleArt)
-  finaleArt.querySelector('.finale-back').addEventListener('click', () => {
-    const prev = progression.prevId(current.id)
-    if (prev) loadLevel(prev)
-  })
   scene.setHoverHandler((info) => {
     if (info) partLabel.show(info); else partLabel.hide()
     diagramPanel.setHoverVisible(!!info)
@@ -182,7 +178,7 @@ export function startGame(mount) {
       caps[0].textContent = t({ zh: '“10·9·8…发射！”', en: '“10·9·8… BLAST OFF!”' })
       caps[1].textContent = t({ zh: '“几小时之后……”', en: '“few hours later”' })
       caps[2].textContent = t({ zh: '“火星（看着像月球…不过没关系啦）”', en: '“Mars (look like moon but… oh well.)”' })
-      finaleArt.querySelector('.finale-back').textContent = t({ zh: '← 上一关', en: '← Back' })
+      finaleArt.querySelector('.finale-end').textContent = t({ zh: '— 全剧终 —', en: '— The End —' })
     }
     if (level.finale) {
       params = {}
