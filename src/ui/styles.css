@@ -73,7 +73,10 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .diagram-hint.hidden { display: none; }
 .diagram-panel { position: absolute; top: 0; right: 0; height: 100%; width: 540px; max-width: 92vw; box-sizing: border-box; background: rgba(9,14,26,.96); border-left: 1px solid #2f6bff; padding: 22px 24px; overflow-y: auto; pointer-events: auto; transform: translateX(0); transition: transform .22s ease; }
 .diagram-panel.hidden { transform: translateX(103%); }
-.diagram-title { font-weight: 600; font-size: 16px; margin-bottom: 10px; color: #e6ebf2; }
+.diagram-title { font-weight: 600; font-size: 16px; margin-bottom: 10px; color: #e6ebf2; padding-right: 40px; }
+.diagram-close { position: absolute; top: 10px; right: 12px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #3a5170;
+  background: rgba(255,255,255,.08); color: #cdd8ea; font-size: 15px; line-height: 32px; text-align: center; padding: 0; cursor: pointer; z-index: 3; }
+.diagram-close:hover { background: rgba(255,255,255,.18); color: #fff; }
 .diagram-body svg { display: block; width: 100%; height: auto; }
 .part-label { position: fixed; transform: translate(16px, -50%); background: rgba(9,14,26,.95); border: 1px solid #66ddff; border-radius: 8px; padding: 7px 12px; pointer-events: none; z-index: 20; white-space: nowrap; }
 .part-label.hidden { display: none; }
@@ -89,10 +92,11 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .playing .hud-hook, .playing .hud-panel, .playing .bp-formula, .playing .bp-arrows { opacity: 0; pointer-events: none; }
 
 /* ---- 结尾页：Amie 的三幕旅程（起飞→太空→火星），背景是开场那片橘色黄昏天空 ---- */
-.finale-art { position: fixed; inset: 0; z-index: 36; display: flex; align-items: flex-start; justify-content: center; overflow-y: auto;
+.finale-art { position: fixed; inset: 0; z-index: 36; overflow-y: auto; -webkit-overflow-scrolling: touch;
   background: linear-gradient(180deg, #33356a 0%, #7a5570 30%, #bf7148 52%, #e59a4a 70%, #f6c266 86%, #fce3a6 100%); pointer-events: auto; }
 .finale-art.hidden { display: none; }
-.finale-inner { text-align: center; max-width: 1080px; padding: 44px 24px; margin: auto; }  /* margin auto：内容居中，超高时可从顶部滚动（避免 flex 居中裁切） */
+/* 普通块级、从上往下滚动：内容再高也不会被裁掉（避免 flex 居中裁切顶部） */
+.finale-inner { box-sizing: border-box; text-align: center; max-width: 1080px; margin: 0 auto; padding: 44px 24px; }
 .finale-msg { color: #fff6e8; font-size: clamp(15px, 2.2vw, 21px); line-height: 1.5; margin-bottom: 30px; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
 /* 错落一排（不重叠）：三张高低错开、各带倾角，一屏内看全 */
 .finale-gallery { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 2.2%; }

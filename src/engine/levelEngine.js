@@ -111,7 +111,7 @@ export function startGame(mount) {
         : t({ zh: '还差一点，调整参数再试试。', en: 'Not quite — tweak the parameters and try again.' })
     hud.setFeedback({ goalMet, message })
     // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-    const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'full' ? 23000 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
+    const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'full' ? 24500 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
     // 发射后进入"运镜模式"：淡出 hook/公式/控制面板，让动画画面干净；动画演完再淡回（手机上尤其重要）
     mount.classList.add('playing')
     clearTimeout(playTimer)
@@ -168,6 +168,7 @@ export function startGame(mount) {
     // 栅格舵(6.1)、自生增压(3.4)；其余就地标在主火箭
     const PANEL_LEVELS = new Set(['8.1', '2.3', '6.1', '3.4'])
     diagramPanel.setDiagram(PANEL_LEVELS.has(level.id) ? level.diagram : null)
+    if (window.matchMedia('(hover: none)').matches) diagramPanel.present()   // 手机等无悬停设备：进关自动弹出讲解图，看完点 ✕ 关闭再作答
 
     if (interactionMod) { interactionMod.destroy(); interactionMod = null }
     hud.setLaunchVisible(!level.finale)   // 结尾页没有"发射"，就一张火星合影

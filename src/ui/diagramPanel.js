@@ -9,6 +9,7 @@ export function createDiagramPanel(mount) {
   root.innerHTML = `
     <div class="diagram-hint hidden"></div>
     <div class="diagram-panel hidden">
+      <button class="diagram-close" aria-label="close">✕</button>
       <div class="diagram-title"></div>
       <div class="diagram-body"></div>
     </div>`
@@ -24,6 +25,7 @@ export function createDiagramPanel(mount) {
   let live3d = null
   let visible = false
   let overPanel = false
+  let pinned = false    // 手机进关自动弹出时固定显示，直到点关闭（不被悬停逻辑收起）
   let hideTimer = null
 
   function clear3d() { if (live3d) { live3d.dispose(); live3d = null } }
@@ -45,16 +47,18 @@ export function createDiagramPanel(mount) {
     clear3d()
   }
   function scheduleHide() {
+    if (pinned) return   // 固定展示时不自动收起
     if (hideTimer) clearTimeout(hideTimer)
     hideTimer = setTimeout(() => { if (!overPanel) hide() }, 320)
   }
 
   panel.addEventListener('mouseenter', () => { overPanel = true; if (hideTimer) clearTimeout(hideTimer) })
   panel.addEventListener('mouseleave', () => { overPanel = false; scheduleHide() })
+  root.querySelector('.diagram-close').addEventListener('click', () => { pinned = false; hide() })
 
   return {
     setDiagram(diagram) {
-      hide()
+      pinned = false; hide()
       current = diagram && (diagram.svg || diagram.model3d) ? diagram : null
       if (current) {
         titleEl.textContent = t(current.title) || t({ zh: '剖面构造', en: 'Cutaway' })
@@ -74,6 +78,8 @@ export function createDiagramPanel(mount) {
       if (over) { if (hideTimer) clearTimeout(hideTimer); show() }
       else scheduleHide()
     },
+    // 进关自动弹出（手机等无悬停设备用）：固定显示，直到点 ✕ 关闭
+    present() { if (current) { pinned = true; show() } },
     destroy() { clear3d(); if (hideTimer) clearTimeout(hideTimer); if (root.parentNode) root.parentNode.removeChild(root) },
   }
 }
