@@ -1011,54 +1011,50 @@ export function createRocketScene(mount) {
         // 要点：尾焰(发动机)始终在【下方】；掉头后一路【竖直、发动机朝下】笔直落向筷子。
         // 镜头运镜：①②③ 拉远拉高看清整条"冲高→到顶→下坠"的弹道弧线；④ 推近看夹取。
         // 关键：因为镜头拉远了，助推器才敢在画面里做大幅度的垂直位移而不冲出取景框。
-        const rt = anim.t   // 注意：别用变量名 t，会遮蔽 i18n 的 t()
+        const rt = anim.t   // 注意：别用变量名 t，会遮蔽 i18n 的 t()（总时长 ~14 秒到夹住）
         let tgtY, tgtX, tgtRot, burn = 0, glow = 0, fins, showSite = false, bgI = 1
-        let camPX = 9, camPY = 12, camPZ = 46, camLY = 11    // 默认：高空弹道全景镜头
-        if (rt < 5.0) {                   // ① 掉头 · 回推点火（爬升中）
-          sepStep = t({ zh: '① 掉头 · 回推点火（爬升）', en: '① Flip around · boostback burn (climbing)' })
-          tgtY = 8 + (rt / 5) * 4          // 明显向上冲：8 → 12
+        let camPX = 9, camPY = 12, camPZ = 44, camLY = 11    // 默认：高空弹道全景镜头
+        if (rt < 3.5) {                   // ① 掉头 · 回推点火（爬升）
+          sepStep = t({ zh: '① 掉头 · 回推点火', en: '① Flip around · boostback burn' })
+          tgtY = 8 + (rt / 3.5) * 3.5      // 明显向上冲：8 → 11.5
           tgtX = 2.6; tgtRot = 1.55        // 翻成横向：发动机指向弹道前方
-          burn = (rt > 1.8 && rt < 4.4) ? 900000 : 0
-          fins = 0
-          bgI = 0.42
-        } else if (rt < 16.0) {           // ② 无动力滑行 · 冲高到顶 →（特写）栅格舵展开（熄火）
-          const cp = (rt - 5) / 11         // 0..1 滑行进度
-          tgtY = 15.5 - 14 * (cp - 0.42) * (cp - 0.42)  // 抛物线：冲到 ~15.5 的最高点再缓缓越过下坠（全程在动）
-          tgtX = 1.0; tgtRot = 0           // 转回竖直、发动机朝下
-          bgI = 0.34                        // 弹道最高点：最接近太空，天空压得最暗（和落地形成强对比）
-          if (rt < 9.0) {                   // ②a 广角：看它熄火冲高到弹道最高点
-            sepStep = t({ zh: '② 熄火滑行 · 冲高到弹道最高点', en: '② Coast (engines off) · climbing to the top of the arc' })
+          burn = (rt > 1.0 && rt < 3.0) ? 900000 : 0
+          fins = 0; bgI = 0.42
+        } else if (rt < 8.5) {            // ② 无动力滑行 · 冲高到顶 →（特写）栅格舵展开（熄火）
+          const cp = (rt - 3.5) / 5        // 0..1 滑行进度
+          tgtY = 14 - 11 * (cp - 0.4) * (cp - 0.4)   // 抛物线：冲到 ~14 的最高点再越过下坠
+          tgtX = 1.0; tgtRot = 0; bgI = 0.34
+          if (rt < 5.5) {                  // ②a 广角：看它熄火冲高到弹道最高点
+            sepStep = t({ zh: '② 熄火滑行 · 冲高到弹道最高点', en: '② Coast (engines off) · up to the top of the arc' })
             fins = 0
-          } else {                          // ②b 特写：镜头拉近箭体顶部，强调栅格舵翻出与作用
-            sepStep = t({ zh: '② 栅格舵展开：高速气流穿过格栅 → 给坠落的一级操舵控姿', en: '② Grid fins deploy: air rushing through the lattice steers the falling booster' })
-            fins = Math.min(1, (rt - 9.0) / 4.5)        // 特写里【慢慢】把栅格舵翻出来看清楚
-            camPX = 5; camPY = tgtY + 6.8; camPZ = 11; camLY = tgtY + 6.8   // 推近到栅格舵（箭体顶部）
+          } else {                         // ②b 特写：镜头拉近箭体顶部，看清栅格舵翻出
+            sepStep = t({ zh: '② 栅格舵展开：高速气流穿过格栅 → 操舵控姿', en: '② Grid fins deploy: airflow through the lattice steers the fall' })
+            fins = Math.min(1, (rt - 5.5) / 2.5)
+            camPX = 5; camPY = tgtY + 6.6; camPZ = 11; camLY = tgtY + 6.6   // 推近到栅格舵（箭体顶部）
           }
-        } else if (rt < 22.0) {           // ③ 再入点火 · 减速（加速下坠、穿回大气层，天空由暗转亮）
+        } else if (rt < 12.0) {           // ③ 再入点火 · 减速（加速下坠、穿回大气层，天空转亮）
           sepStep = t({ zh: '③ 再入点火 · 减速', en: '③ Reentry burn · slow the fall' })
-          const rp = (rt - 16) / 6
-          tgtY = 13 - 9 * rp * rp          // 加速下坠（越掉越快，像重力）：13 → 4
+          const rp = (rt - 8.5) / 3.5
+          tgtY = 13 - 9.5 * rp * rp        // 加速下坠：13 → 3.5
           tgtX = 0.2; tgtRot = 0
-          burn = (rt > 17.0 && rt < 21.0) ? 560000 : 0
-          glow = rt < 20.4 ? Math.min(0.65, (rt - 16.4) / 1.6) : Math.max(0, 0.65 - (rt - 20.4) * 1.0)
-          fins = 1
-          bgI = 0.85
-          camPY = 8; camPZ = 34; camLY = 8   // 开始往回带镜头
+          burn = (rt > 9.2 && rt < 11.6) ? 560000 : 0
+          glow = rt < 11.2 ? Math.min(0.65, (rt - 8.7) / 1.3) : Math.max(0, 0.65 - (rt - 11.2) * 1.2)
+          fins = 1; bgI = 0.85
+          camPY = 8; camPZ = 32; camLY = 8   // 开始往回带镜头
         } else {                          // ④ 着陆点火 · 深度节流悬停 · 被筷子夹住（露出发射场）
           sepStep = t({ zh: '④ 着陆点火 · 悬停 · 被筷子夹住', en: '④ Landing burn · hover · caught by the arms' })
           tgtY = 3; tgtX = 0; tgtRot = 0
           burn = rocketY > 3.15 ? 500000 : 0
-          fins = 1; showSite = true
-          bgI = 1.05
-          camPY = 4.5; camPZ = 25; camLY = 7.5   // 推近特写：看清筷子夹取
+          fins = 1; showSite = true; bgI = 1.05
+          camPX = 9; camPY = 4.5; camPZ = 25; camLY = 7.5   // 推近特写：看清筷子夹取
         }
-        camera.position.lerp(_tmpV.set(camPX, camPY, camPZ), 0.035)     // 平滑运镜（拉远/推近/特写）
-        camLook.lerp(_tmpV.set(0, camLY, 0), 0.035); camera.lookAt(camLook)
-        scene.backgroundIntensity += (bgI - scene.backgroundIntensity) * 0.045  // 明暗切换更快更明显
+        camera.position.lerp(_tmpV.set(camPX, camPY, camPZ), 0.06)     // 平滑运镜（更跟手）
+        camLook.lerp(_tmpV.set(0, camLY, 0), 0.06); camera.lookAt(camLook)
+        scene.backgroundIntensity += (bgI - scene.backgroundIntensity) * 0.06  // 明暗切换更快更明显
         if (showSite) ground.visible = pad.visible = tower.visible = true
-        rocketY += (tgtY - rocketY) * 0.06     // 跟得上抛物线（比原来更快，位移看得出来）
-        rocket.position.x += (tgtX - rocket.position.x) * 0.03
-        rocket.rotation.z += (tgtRot - rocket.rotation.z) * 0.03
+        rocketY += (tgtY - rocketY) * 0.09     // 跟得上更紧凑的弹道
+        rocket.position.x += (tgtX - rocket.position.x) * 0.06
+        rocket.rotation.z += (tgtRot - rocket.rotation.z) * 0.06
         setFinsDeploy(fins); reentryMat.opacity = glow
         flameThrust = burn; bright = true
       } else if (anim.type === 'sealand') {
