@@ -193,9 +193,16 @@ export function startGame(mount) {
     refresh()
   }
 
-  loadLevel(progression.nextLockedUnlockedId())
+  // 直达链接：URL 带 #<关卡id>（如 #finale、#4.4）就直接跳到那一关，方便预览/分享（不影响正常解锁流程）
+  function idFromHash() {
+    const h = decodeURIComponent((location.hash || '').replace(/^#/, '')).trim()
+    return h && LEVELS.some((l) => l.id === h) ? h : null
+  }
+  loadLevel(idFromHash() || progression.nextLockedUnlockedId())
+  const onHashChange = () => { const id = idFromHash(); if (id && (!current || current.id !== id)) loadLevel(id) }
+  window.addEventListener('hashchange', onHashChange)
 
   return {
-    dispose: () => { offLang(); window.removeEventListener('resize', positionFormula); if (langBtn.parentNode) langBtn.parentNode.removeChild(langBtn); scene.dispose(); overlay.dispose(); partLabel.destroy(); diagramPanel.destroy() },
+    dispose: () => { offLang(); window.removeEventListener('resize', positionFormula); window.removeEventListener('hashchange', onHashChange); if (langBtn.parentNode) langBtn.parentNode.removeChild(langBtn); scene.dispose(); overlay.dispose(); partLabel.destroy(); diagramPanel.destroy() },
   }
 }
