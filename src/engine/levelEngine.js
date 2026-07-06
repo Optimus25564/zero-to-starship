@@ -116,7 +116,7 @@ export function startGame(mount) {
         : t({ zh: '还差一点，调整参数再试试。', en: 'Not quite — tweak the parameters and try again.' })
     hud.setFeedback({ goalMet, message })
     // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-    const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'full' ? 27000 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
+    const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'full' ? 23000 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
     // 发射后进入"运镜模式"：淡出 hook/公式/控制面板，让动画画面干净；动画演完再淡回（手机上尤其重要）
     mount.classList.add('playing')
     clearTimeout(playTimer)

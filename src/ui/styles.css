@@ -111,11 +111,12 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 /* 目标：文案(顶部 hook + 底部控制面板)压扁到上下两条，中间留出一整条给 3D 动画，不挡住火箭。 */
 @media (max-width: 640px) {
   .hud-hook {
-    left: 8px; right: 8px; top: 8px; padding: 9px 12px;
+    left: 8px; right: 62px; top: 8px; padding: 9px 12px;   /* 右侧给 EN/中文 按钮让位，避免遮挡文字 */
     font-size: 12.5px; line-height: 1.45; max-width: none;
     max-height: 24vh; overflow-y: auto; background: rgba(10,16,32,.62);
     -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
   }
+  .lang-toggle { top: 8px !important; padding: 4px 10px !important; font-size: 12px !important; }
   .hud-panel {
     left: 8px; right: 8px; bottom: 8px; width: auto;
     padding: 12px 13px; max-height: 46vh; overflow-y: auto;
