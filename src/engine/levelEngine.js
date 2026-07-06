@@ -178,14 +178,8 @@ export function startGame(mount) {
     hud.setLaunchVisible(!level.finale)   // 结尾页没有"发射"，就一张火星合影
     finaleArt.classList.toggle('hidden', !level.finale)
     if (level.finale) {
-      finaleArt.querySelector('.finale-msg').textContent = t({
-        zh: '🎉 你做到了！这趟旅程，正是 Amie 画下的样子 ——',
-        en: '🎉 You made it! The whole journey — just as Amie drew it —',
-      })
-      finaleArt.querySelector('.finale-credit').textContent = t({
-        zh: '本游戏灵感来自 Amie —— 一位未来的宇航员 ✨',
-        en: 'This game is inspired by Amie — a future astronaut ✨',
-      })
+      finaleArt.querySelector('.finale-msg').textContent = t(level.hook)   // 复盘式收尾（从零到星舰的整段旅程）
+      finaleArt.querySelector('.finale-credit').textContent = 'inspired by Amie — a future astronaut'
       finaleArt.querySelector('.finale-back').textContent = t({ zh: '← 上一关', en: '← Back' })
     }
     if (level.finale) {

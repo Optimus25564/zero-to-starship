@@ -106,7 +106,10 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .finale-piece:nth-child(2) .finale-frame { transform: rotate(2deg); }
 .finale-piece:nth-child(3) .finale-frame { transform: rotate(-1.5deg); }
 .finale-piece figcaption { margin-top: 12px; color: #fff6e8; font-size: 14px; line-height: 1.4; text-shadow: 0 1px 6px rgba(0,0,0,.55); }
-.finale-credit { margin-top: 28px; color: #fff6e8; font-size: clamp(14px, 1.9vw, 18px); font-weight: 600; text-shadow: 0 2px 10px rgba(0,0,0,.5); }
+/* 底部一行不起眼的手写小字致谢 */
+.finale-credit { margin-top: 34px; color: #fff2e0; font-weight: 400; opacity: .72; transform: rotate(-1.5deg);
+  font-family: "Snell Roundhand", "Bradley Hand", "Segoe Script", "Comic Sans MS", cursive;
+  font-size: clamp(14px, 1.7vw, 18px); text-shadow: 0 1px 5px rgba(0,0,0,.35); }
 .finale-back { margin-top: 20px; padding: 8px 18px; border: 1px solid rgba(255,255,255,.5); border-radius: 16px;
   background: rgba(0,0,0,.18); color: #fff6e8; font-size: 13px; cursor: pointer; }
 .finale-back:hover { background: rgba(0,0,0,.34); }
