@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>小小 SpaceX 工程师 · 小游戏合集</title>
+<link rel="stylesheet" href="common.css" />
+<style>
+  .wrap{width:100%; max-width:920px}
+  .lead{color:var(--muted); font-size:14px; line-height:1.6; margin:0 0 8px}
+  .lead b{color:var(--flame2)}
+  .progress{font-size:13px; color:var(--muted); margin:0 0 20px}
+  .progress b{color:var(--ok)}
+  .chapter{margin:26px 0 10px; display:flex; align-items:baseline; gap:10px}
+  .chapter .num{font-size:12px; font-weight:800; color:#04140a; background:var(--flame2); border-radius:999px; padding:2px 10px}
+  .chapter h2{font-size:16px; margin:0}
+  .chapter .cen{color:var(--muted); font-size:12px; font-weight:500}
+  .cards{display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:12px}
+  .g{display:block; text-decoration:none; color:var(--ink); border:1px solid var(--line); border-radius:14px;
+     background:var(--panel); padding:14px; transition:.15s; position:relative; overflow:hidden}
+  .g:hover{border-color:var(--flame); transform:translateY(-2px)}
+  .g .medal{position:absolute; top:10px; right:12px; font-size:18px; filter:grayscale(1) opacity(.35)}
+  .g.done .medal{filter:none}
+  .g.done{border-color:rgba(87,211,140,.5)}
+  .g .gt{font-size:15px; font-weight:700; margin-bottom:2px; padding-right:24px}
+  .g .ge{font-size:11px; color:var(--muted); margin-bottom:8px}
+  .g .type{display:inline-block; font-size:10px; letter-spacing:.3px; text-transform:uppercase;
+           color:var(--muted); border:1px solid var(--line); border-radius:999px; padding:2px 8px}
+  .g.soon{opacity:.55; cursor:default; pointer-events:none}
+  .g.soon .type{color:var(--half); border-color:var(--half)}
+  .g .concept{font-size:11px; color:#6d7d92; margin-top:8px; line-height:1.4}
+  footer{color:#4a5568; font-size:11px; margin-top:32px; max-width:920px; line-height:1.5}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header style="margin-bottom:6px">
+      <div class="htitle"><h1>小小 SpaceX 工程师</h1><span class="en">Little SpaceX Engineer · 小游戏合集</span></div>
+      <div class="headright"><span class="langtoggle" id="langBtn">EN</span></div>
+    </header>
+    <p class="lead" id="lead">从<b>牛顿第三定律</b>一路玩到<b>火星往返</b>。每个小游戏都亲手动手、允许失败、从物理第一性原理出发。挑一个开始吧。</p>
+    <p class="progress" id="prog"></p>
+
+    <div id="chapters"></div>
+
+    <footer id="foot">原型演示 · Prototype. 卡通马斯克为教学虚构演绎，台词均为原创教学创作。物理为公开资料的简化科普版。</footer>
+  </div>
+
+<script>
+(() => {
+  let lang = 'zh';
+  // type labels
+  const TY = {
+    control:{zh:'实时操控',en:'Real-time'}, sim:{zh:'物理模拟',en:'Sim'}, timing:{zh:'时机挑战',en:'Timing'},
+    slider:{zh:'调参',en:'Sliders'}, choice:{zh:'情境选择',en:'Choices'}, sort:{zh:'排序拼装',en:'Sequence'},
+    decide:{zh:'决策',en:'Decision'}, calc:{zh:'算账',en:'Math'}, alloc:{zh:'资源配平',en:'Allocate'}
+  };
+  const CH = [
+    { n:'一', zh:'物理训练营', en:'Physics Bootcamp', games:[
+      {id:'throw-balls',   zh:'滑板扔球',   en:'Skateboard Throw',  ty:'control', c:{zh:'作用力=反作用力',en:'Action–reaction'}},
+      {id:'balloon',       zh:'气球火箭',   en:'Balloon Rocket',    ty:'control', c:{zh:'气往哪喷，就往反方向飞',en:'Thrust direction'}},
+      {id:'newton-cannon', zh:'牛顿大炮',   en:"Newton's Cannon",   ty:'sim',     c:{zh:'轨道=永远掉不到地上的下落',en:'What an orbit is'}},
+      {id:'space-hockey',  zh:'太空曲棍球', en:'Space Hockey',      ty:'control', c:{zh:'惯性：刹车也要花燃料',en:'Inertia'}},
+      {id:'shopping-cart', zh:'购物车赛跑', en:'Shopping Cart Race',ty:'control', c:{zh:'F=ma：越轻加速越快',en:'F=ma'}},
+      {id:'twr-bench',     zh:'举重比赛',   en:'TWR Test Bench',    ty:'slider',  c:{zh:'推重比：推力要赢过重量',en:'Thrust-to-weight'}},
+    ]},
+    { n:'二', zh:'火箭工厂', en:'Rocket Factory', games:[
+      {id:'nozzle',           zh:'喷管实验',     en:'Nozzle Lab',        ty:'slider', c:{zh:'先掐脖子，再放开',en:'De Laval nozzle'}},
+      {id:'engine-pipeline',  zh:'发动机流水线', en:'Engine Pipeline',   ty:'sort',   c:{zh:'泵→燃烧→喉部→膨胀→推力',en:'Engine chain'}},
+      {id:'fuel-test',        zh:'燃料试验场',   en:'Propellant Lab',    ty:'sim',    c:{zh:'比冲：燃料的灵魂',en:'Specific impulse'}},
+      {id:'material-triangle',zh:'材料商店',     en:'Material Shop',     ty:'choice', c:{zh:'轻/强/便宜，挑两个',en:'Pick two'}},
+      {id:'wind-tunnel',      zh:'风洞实验',     en:'Wind Tunnel',       ty:'sim',    c:{zh:'速度翻倍，风墙×4',en:'Drag ~ v²'}},
+      {id:'maxq',             zh:'Max-Q 油门',   en:'Max-Q Throttle',    ty:'timing', c:{zh:'该怂就怂：过最大动压',en:'Max dynamic pressure'}},
+    ]},
+    { n:'三', zh:'飞向轨道', en:'To Orbit', games:[
+      {id:'rocket-equation-wall', zh:'撞墙实验',   en:'The Math Wall',     ty:'sim',     c:{zh:'火箭方程：堆燃料的回报递减',en:'Tsiolkovsky'}},
+      {id:'staging',              zh:'甩掉包袱',   en:'Drop the Deadweight',ty:'timing', c:{zh:'烧完一截，扔掉一截',en:'Staging'}},
+      {id:'launch-director',      zh:'发射总监',   en:'Launch Director',   ty:'decide',  c:{zh:'敢喊停，才是好工程师',en:'GO / HOLD / SCRUB'}},
+      {id:'gravity-turn',         zh:'重力转弯',   en:'Gravity Turn',      ty:'control', c:{zh:'不是往上飞，是往旁边飞',en:'Fly sideways'}},
+      {id:'circularize',          zh:'圆化点火',   en:'Circularize',       ty:'timing',  c:{zh:'位置比力气重要',en:'Burn at apogee'}},
+    ]},
+    { n:'四', zh:'接住火箭', en:'Catch the Booster', games:[
+      {id:'recovery-steps',  zh:'回收四部曲', en:'Recovery Sequence', ty:'sort',   c:{zh:'掉头→再入→栅格舵→着陆',en:'Return steps'}},
+      {id:'cost-accounting', zh:'出租车经济学',en:'Taxi Economics',   ty:'calc',   c:{zh:'火箭贵在一次性，不在材料',en:'Reuse math'}},
+      {id:'suicide-burn',    zh:'自杀式着陆', en:'Suicide Burn',      ty:'timing', c:{zh:'不能悬停=只有一次机会',en:'Hoverslam'}},
+      {id:'chopsticks',      zh:'筷子夹火箭', en:'Chopsticks Catch',  ty:'timing', c:{zh:'最好的零件是不存在的零件',en:'Mechazilla'}},
+    ]},
+    { n:'五', zh:'星辰大海', en:'Mars & Beyond', games:[
+      {id:'reentry-corridor',zh:'火墙冲刺',   en:'Reentry Corridor',  ty:'timing', c:{zh:'钝头把热量推给空气',en:'Blunt body'}},
+      {id:'life-support',    zh:'生命保障配平',en:'Life Support',     ty:'alloc',  c:{zh:'给人设计=万无一失',en:'Redundancy'}},
+      {id:'escape-reaction', zh:'逃逸反应',   en:'Escape Reflex',     ty:'timing', c:{zh:'宁可白逃一次',en:'Abort'}},
+      {id:'pass-the-ball',   zh:'传球训练',   en:'Lead the Target',   ty:'control',c:{zh:'朝它"将要在"的位置扔',en:'Lead the target'}},
+      {id:'launch-window',   zh:'发射窗口',   en:'Launch Window',     ty:'timing', c:{zh:'每26个月一次机会',en:'Hohmann window'}},
+    ]},
+  ];
+
+  function earned(id){ try{ return localStorage.getItem('mg.badge.'+id)==='1'; }catch(e){ return false; } }
+  function exists(){ return window.__built || {}; } // filled by probe below
+
+  const chaptersEl = document.getElementById('chapters');
+
+  function render(){
+    const zh = lang==='zh';
+    document.getElementById('langBtn').textContent = zh?'EN':'中';
+    document.documentElement.lang = lang;
+    let total=0, got=0;
+    chaptersEl.innerHTML='';
+    for(const ch of CH){
+      const head=document.createElement('div'); head.className='chapter';
+      head.innerHTML = `<span class="num">${zh?'第 '+ch.n+' 章':'Ch. '+ch.n}</span>
+        <h2>${zh?ch.zh:ch.en}</h2><span class="cen">${zh?ch.en:ch.zh}</span>`;
+      chaptersEl.appendChild(head);
+      const cards=document.createElement('div'); cards.className='cards';
+      for(const g of ch.games){
+        total++;
+        const built = BUILT.has(g.id);
+        const done = earned(g.id);
+        if(done) got++;
+        const a=document.createElement(built?'a':'div');
+        a.className='g'+(done?' done':'')+(built?'':' soon');
+        if(built) a.href = 'games/'+g.id+'.html';
+        a.innerHTML = `<span class="medal">🏅</span>
+          <div class="gt">${zh?g.zh:g.en}</div>
+          <div class="ge">${zh?g.en:g.zh}</div>
+          <span class="type">${built?(TY[g.ty]?(zh?TY[g.ty].zh:TY[g.ty].en):g.ty):(zh?'即将推出':'soon')}</span>
+          <div class="concept">${zh?g.c.zh:g.c.en}</div>`;
+        cards.appendChild(a);
+      }
+      chaptersEl.appendChild(cards);
+    }
+    document.getElementById('prog').innerHTML = zh
+      ? `已解锁徽章 <b>${got}</b> / ${total}　·　点亮一个小游戏即收集一枚徽章 🏅`
+      : `Badges earned <b>${got}</b> / ${total}　·　clear a game to collect its badge 🏅`;
+    document.getElementById('lead').innerHTML = zh
+      ? '从<b>牛顿第三定律</b>一路玩到<b>火星往返</b>。每个小游戏都亲手动手、允许失败、从物理第一性原理出发。挑一个开始吧。'
+      : 'Play from <b>Newton\'s 3rd law</b> all the way to a <b>Mars round-trip</b>. Every game is hands-on, failure-friendly, and built up from first principles. Pick one to start.';
+    document.getElementById('foot').textContent = zh
+      ? '原型演示 · Prototype. 卡通马斯克为教学虚构演绎，台词均为原创教学创作。物理为公开资料的简化科普版。'
+      : 'Prototype. The cartoon Musk is a fictional teaching character; all lines are original. Physics is a simplified, public-source science version.';
+  }
+
+  // Which games are actually built. Updated as agents finish; the hub also live-probes.
+  const BUILT = new Set(['newton-cannon']);
+  // live-probe each game file so the hub auto-enables cards as files appear
+  const ALL = CH.flatMap(c=>c.games.map(g=>g.id));
+  Promise.all(ALL.map(id => fetch('games/'+id+'.html',{method:'HEAD'})
+      .then(r=>{ if(r.ok) BUILT.add(id); }).catch(()=>{})))
+    .then(render);
+
+  document.getElementById('langBtn').addEventListener('click', ()=>{ lang = lang==='zh'?'en':'zh'; render(); });
+  render();
+})();
+</script>
+</body>
+</html>

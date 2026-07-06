@@ -34,5 +34,11 @@ export function createProgression(levelIds) {
     return i > 0 ? levelIds[i - 1] : null
   }
 
-  return { isUnlocked, complete, getStars, nextLockedUnlockedId, prevId }
+  // 顺序上的下一关（"下一关"按钮用：始终按 ORDER 走，不受是否通关影响）；末关返回 null
+  function nextId(id) {
+    const i = indexOf(id)
+    return i >= 0 && i < levelIds.length - 1 ? levelIds[i + 1] : null
+  }
+
+  return { isUnlocked, complete, getStars, nextLockedUnlockedId, prevId, nextId }
 }

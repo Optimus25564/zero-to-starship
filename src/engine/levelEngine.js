@@ -148,7 +148,7 @@ export function startGame(mount) {
       hud = createHud(mount, {
         onLaunch: launch,
         onNext: () => {
-          const next = progression.nextLockedUnlockedId()
+          const next = progression.nextId(current.id) || progression.nextLockedUnlockedId()
           if (next) loadLevel(next)
         },
         onPrev: () => {
