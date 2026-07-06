@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>圆化点火 · Circularize</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  /* game-specific only: the canvas is tappable, and a tiny sub-hint line */
+  .stage{cursor:pointer}
+  .prompt{max-width:640px; width:100%; margin:8px 0 0; font-size:12px; color:var(--muted); text-align:center; line-height:1.5}
+  .prompt b{color:var(--flame2)}
+  .vstars{display:block; margin-top:6px; font-size:18px; letter-spacing:2px}
+</style>
+</head>
+<body>
+  <header>
+    <div class="htitle"><h1 id="title">圆化点火</h1><span class="en" id="titleEn">Circularize</span></div>
+    <div class="headright">
+      <a class="backlink" href="../index.html" id="back">← 目录</a>
+      <span class="langtoggle" id="langBtn">EN</span>
+    </div>
+  </header>
+
+  <p class="hook" id="hook"></p>
+
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="readout">
+      <span class="big" id="alt">400</span><span class="unit">km</span>
+      <span class="chip" id="pos"></span>
+    </div>
+    <div class="analogy" id="apsis"></div>
+
+    <div class="buttons">
+      <button class="fire" id="burnBtn">点火 BURN</button>
+      <button class="ghost" id="retryBtn">重来</button>
+    </div>
+    <p class="prompt" id="prompt"></p>
+  </div>
+
+  <div class="panel">
+    <p class="q" id="quizQ"></p>
+    <div class="choices" id="choices"></div>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <div class="badge" id="badge">
+    <span class="medal">🏅</span>
+    <span id="badgeText"></span>
+  </div>
+
+<script>
+(() => {
+  // ---------- physics constants (real Earth, 2-body) ----------
+  const R   = 6371;                 // km, Earth radius
+  const MU  = 398600;               // km^3/s^2, GM
+  // Atmosphere top is drawn thicker than reality so a 10-year-old can SEE the
+  // "danger zone"; the ORBIT math (vis-viva, ellipse-from-state) stays real.
+  const R_ATM = 7171;               // km — below this radius the craft burns up
+  const DV  = 0.805;                // km/s prograde nudge (== circularize-at-apogee Δv)
+  const INIT = { rp: 6771, ra: 11371 };  // start: perigee grazes atmosphere, apogee high
+
+  // ---------- i18n ----------
+  const T = {
+    zh: {
+      title:'圆化点火', titleEn:'Circularize', lang:'EN', back:'← 目录',
+      hook:'马斯克：<b>在最高点轻轻一脚，椭圆就变圆了。位置比力气重要。</b> 这条椭圆的最低点正擦着大气层，迟早烧掉——在<b>最高点</b>点一脚，把对面的最低点抬起来。',
+      burn:'点火 BURN', retry:'重来',
+      prompt:'在最高点轻轻一脚，轨道就圆了——位置比力气重要。',
+      posApex:'最高点 ✦ 就是这里！', posPeri:'最低点 · 在大气层里', posUp:'上升中…', posDown:'下降中…',
+      apsis:(ap,pe,danger)=>`远地点 <b>${ap.toLocaleString()}</b> km · 近地点 <b>${pe.toLocaleString()}</b> km${danger?' <span style="color:var(--bad)">（在大气层里！）</span>':''}`,
+      badgeLocked:'徽章未解锁：在最高点点火、把轨道变成正圆，即可获得「圆化点火手」。',
+      badgeEarned:'已获得徽章「圆化点火手」——在最高点加速，抬高的是对面的最低点。',
+      v:{
+        circle:{tag:'圆了！🛰️', t:'完美的圆轨道！你在最高点点火，正好把对面的最低点抬到同样高——椭圆变成了圆。<small> 位置对了，力气刚刚好。</small>', st:3, cls:'ok'},
+        good2:{tag:'差一点点圆', t:'轨道抬起来了，但还带点椭圆。<small> 再靠近最高点一点点，就更圆了。</small>', st:2, cls:'ok'},
+        good1:{tag:'活下来了', t:'没烧掉，但轨道很扁——点火位置离最高点有点远。<small> 抬高的那个点没抬够。</small>', st:1, cls:'half'},
+        burnup:{tag:'烧毁 🔥', t:'点火位置太靠下，对面的最低点还留在大气层里，飞船一头扎进去烧掉了。<small> <b>炸了？又一份数据。</b></small>', st:0, cls:'bad'},
+        escape:{tag:'甩飞了', t:'在最低点附近猛加速，飞船被地球甩了出去。<small> <b>炸了？又一份数据。</b></small>', st:0, cls:'bad'}
+      },
+      quizQ:'为什么要在<b>最高点</b>点火？',
+      c1:'那里最省事、最好按', c2:'在最高点加速，能把对面的最低点抬高，轨道就变圆了',
+      fbOk:'对！点火抬高的是<b>对面</b>那个点。在最高点加速，抬起来的正是最低点——两点一样高，就成了圆。',
+      fbNo:'再想想：点火抬高的是<b>对面</b>的点。要变圆，就得在最高点点火去抬最低点。'
+    },
+    en: {
+      title:'Circularize', titleEn:'圆化点火', lang:'中', back:'← Menu',
+      hook:'Musk: <b>A gentle nudge at the highest point turns an ellipse into a circle. Position matters more than force.</b> This ellipse\'s lowest point is grazing the atmosphere — burn at the <b>top</b> to lift the far side up.',
+      burn:'BURN', retry:'Retry',
+      prompt:'A gentle nudge at the highest point — position matters more than force.',
+      posApex:'Apex ✦ right here!', posPeri:'Lowest point · in the air', posUp:'climbing…', posDown:'falling…',
+      apsis:(ap,pe,danger)=>`Apogee <b>${ap.toLocaleString()}</b> km · Perigee <b>${pe.toLocaleString()}</b> km${danger?' <span style="color:var(--bad)">(in the atmosphere!)</span>':''}`,
+      badgeLocked:'Badge locked: burn at the highest point to make a clean circle and earn "Circularizer".',
+      badgeEarned:'Badge earned: "Circularizer" — a burn lifts the point on the OTHER side.',
+      v:{
+        circle:{tag:'Circular! 🛰️', t:'A perfect circle! You burned at the top and lifted the far side up to match — the ellipse became a circle.<small> Right place, just enough push.</small>', st:3, cls:'ok'},
+        good2:{tag:'Almost round', t:'You raised the orbit, but it\'s still a little egg-shaped.<small> Burn a touch closer to the very top for a rounder orbit.</small>', st:2, cls:'ok'},
+        good1:{tag:'Survived', t:'Not burned up — but a very stretched orbit. Your burn was far from the top.<small> The far point didn\'t rise enough.</small>', st:1, cls:'half'},
+        burnup:{tag:'Burned up 🔥', t:'You burned too low — the far side stayed inside the atmosphere and the craft dove straight in.<small> <b>Boom? Another data point.</b></small>', st:0, cls:'bad'},
+        escape:{tag:'Flung away', t:'A hard burn near the low point flung the craft off into the distance.<small> <b>Boom? Another data point.</b></small>', st:0, cls:'bad'}
+      },
+      quizQ:'Why burn at the <b>highest point</b>?',
+      c1:'It\'s the easiest spot to press the button', c2:'Speeding up at the top raises the point on the far side, so the orbit rounds out',
+      fbOk:'Right! A burn lifts the point on the <b>opposite</b> side. At the top, that\'s the lowest point — lift it to match and you get a circle.',
+      fbNo:'Think again: a burn raises the <b>opposite</b> point. To round the orbit, burn at the top to lift the lowest point.'
+    }
+  };
+  let lang = 'zh';
+
+  // ---------- DOM ----------
+  const canvas   = document.getElementById('c');
+  const ctx      = canvas.getContext('2d');
+  const altEl    = document.getElementById('alt');
+  const posEl    = document.getElementById('pos');
+  const apsisEl  = document.getElementById('apsis');
+  const burnBtn  = document.getElementById('burnBtn');
+  const retryBtn = document.getElementById('retryBtn');
+  const verdictEl= document.getElementById('verdict');
+  const badgeEl  = document.getElementById('badge');
+  const badgeText= document.getElementById('badgeText');
+  const promptEl = document.getElementById('prompt');
+
+  // ---------- badge persistence ----------
+  let earned = false;
+  try { earned = localStorage.getItem('mg.badge.circularize') === '1'; } catch(e){}
+
+  // ---------- canvas sizing (DPR-aware) ----------
+  let W=0, H=0, cx=0, cy=0, scale=1, earthPx=0, dpr=1;
+  const stars=[];
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = W*dpr; canvas.height = H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    cx = W/2; cy = H/2;
+    earthPx = Math.min(W,H) * 0.12;
+    scale = earthPx / R;   // px per km
+    if(stars.length===0){
+      for(let i=0;i<150;i++) stars.push({x:Math.random(), y:Math.random(), r:Math.random()*1.3+0.2, a:Math.random()*0.7+0.2});
+    }
+    draw();
+  }
+  const sx = (x)=> cx + x*scale;
+  const sy = (y)=> cy - y*scale;
+
+  // ---------- orbital state (elements) ----------
+  let a, e, omega, theta;   // semi-major (km), ecc, arg of perigee (world rad), true anomaly (rad)
+  let h, T_orb;             // specific angular momentum, period (s)
+  let mode = 'coast';       // coast | good | dive | boom
+  let starsWon = 0;
+  let last = 0, shake = 0, sparkle = 0;
+  let particles = [];
+
+  function derive(){
+    h = Math.sqrt(MU * a * (1 - e*e));
+    T_orb = 2*Math.PI*Math.sqrt(a*a*a/MU);
+  }
+  function setInit(){
+    a = (INIT.rp + INIT.ra)/2;
+    e = (INIT.ra - INIT.rp)/(INIT.ra + INIT.rp);
+    omega = -Math.PI/2;     // perigee points down (screen bottom)
+    theta = 20*Math.PI/180; // start just past perigee, climbing to apogee
+    derive();
+    mode = 'coast'; starsWon = 0; particles = []; shake = 0; sparkle = 0;
+    burnBtn.disabled = false;
+    hideVerdict();
+  }
+
+  // radius at a true anomaly
+  const radiusAt = (th)=> a*(1-e*e)/(1+e*Math.cos(th));
+
+  // full state vector (position & velocity) at current theta
+  function stateVec(){
+    const r = radiusAt(theta);
+    const phi = omega + theta;
+    const px = r*Math.cos(phi), py = r*Math.sin(phi);
+    const vr = (MU/h)*e*Math.sin(theta);
+    const vt = (MU/h)*(1+e*Math.cos(theta));
+    // radial unit (cosphi,sinphi); transverse unit for CCW motion (-sinphi,cosphi)
+    const vx = vr*Math.cos(phi) - vt*Math.sin(phi);
+    const vy = vr*Math.sin(phi) + vt*Math.cos(phi);
+    return {px,py,vx,vy,r};
+  }
+
+  // rebuild elements from a state vector (orbit-from-state)
+  function elementsFrom(px,py,vx,vy){
+    const r  = Math.hypot(px,py);
+    const v2 = vx*vx + vy*vy;
+    const eps = v2/2 - MU/r;                 // specific energy
+    const na  = -MU/(2*eps);                 // new semi-major axis
+    const rv  = px*vx + py*vy;               // r·v
+    // eccentricity vector: ((v^2 - mu/r)r - (r·v)v)/mu
+    const ex = ((v2 - MU/r)*px - rv*vx)/MU;
+    const ey = ((v2 - MU/r)*py - rv*vy)/MU;
+    const ne = Math.hypot(ex,ey);
+    const nomega = Math.atan2(ey,ex);
+    // true anomaly at this point
+    let cosT = (ex*px + ey*py)/((ne*r)||1e-9);
+    cosT = Math.max(-1, Math.min(1, cosT));
+    let nth = Math.acos(cosT);
+    if(rv < 0) nth = 2*Math.PI - nth;        // descending → second half
+    return {na, ne, nomega, nth, eps, rp: na*(1-ne), ra: na*(1+ne)};
+  }
+
+  // ---------- BURN ----------
+  function burn(){
+    if(mode!=='coast') return;
+    const s = stateVec();
+    const spd = Math.hypot(s.vx, s.vy);
+    const ux = s.vx/spd, uy = s.vy/spd;      // prograde direction
+    const nvx = s.vx + DV*ux, nvy = s.vy + DV*uy;
+    const el = elementsFrom(s.px, s.py, nvx, nvy);
+
+    // decide outcome from REAL resulting orbit
+    let key;
+    if(el.eps >= 0 || !isFinite(el.na) || el.na < 0){ key='escape'; }
+    else if(el.rp < R_ATM){ key='burnup'; }
+    else if(el.ne < 0.04){ key='circle'; }
+    else if(el.ne < 0.14){ key='good2'; }
+    else { key='good1'; }
+
+    const res = T[lang].v[key];
+    starsWon = res.st;
+    burnBtn.disabled = true;
+
+    if(key==='escape' || key==='burnup'){
+      // adopt the (doomed) orbit and dive into the atmosphere
+      if(isFinite(el.na) && el.na>0){ a=el.na; e=Math.min(el.ne,0.98); omega=el.nomega; theta=el.nth; derive(); }
+      mode = 'dive';
+    } else {
+      // adopt the good orbit and keep gently coasting on it
+      a=el.na; e=el.ne; omega=el.nomega; theta=el.nth; derive();
+      mode = 'good';
+      sparkle = 1;
+      if(key==='circle'){
+        earned = true;
+        try { localStorage.setItem('mg.badge.circularize','1'); } catch(e){}
+        renderBadge();
+      }
+    }
+    showVerdict(key);
+  }
+
+  // ---------- animation loop ----------
+  function step(now){
+    if(!last) last = now;
+    let dt = (now - last)/1000; last = now;
+    if(dt > 0.05) dt = 0.05;
+
+    if(mode==='coast' || mode==='good' || mode==='dive'){
+      const visT = (mode==='dive') ? 4.5 : 14;   // seconds per orbit on screen
+      const r = radiusAt(theta);
+      let dth = (h/(r*r)) * dt * (T_orb/visT);
+      if(dth > 0.06) dth = 0.06;                  // safety clamp near perigee
+      theta = (theta + dth) % (2*Math.PI);
+
+      if(mode==='dive' && radiusAt(theta) <= R_ATM){
+        // reached the atmosphere → cartoon burn-up
+        const phi = omega + theta, rr = radiusAt(theta);
+        spawnBoom(rr*Math.cos(phi), rr*Math.sin(phi));
+        mode = 'boom';
+      }
+    }
+
+    if(sparkle > 0) sparkle = Math.max(0, sparkle - dt*1.2);
+    if(shake   > 0) shake   = Math.max(0, shake   - dt*2.2);
+    updateParticles(dt);
+
+    updateReadout();
+    draw();
+    requestAnimationFrame(step);
+  }
+
+  // ---------- boom particles ----------
+  function spawnBoom(kx, ky){
+    shake = 1;
+    for(let i=0;i<26;i++){
+      const ang = Math.random()*Math.PI*2;
+      const sp  = (Math.random()*0.6+0.2);
+      particles.push({ x:sx(kx), y:sy(ky), vx:Math.cos(ang)*sp*60, vy:Math.sin(ang)*sp*60,
+                       life:1, r:Math.random()*3+2, hot:Math.random()<0.5 });
+    }
+  }
+  function updateParticles(dt){
+    for(const p of particles){ p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 30*dt; p.life -= dt*0.9; }
+    particles = particles.filter(p=>p.life>0);
+  }
+
+  // ---------- drawing ----------
+  function drawEarth(){
+    // outer atmosphere glow
+    const glow = ctx.createRadialGradient(cx,cy,earthPx*0.95, cx,cy,earthPx*1.6);
+    glow.addColorStop(0,'rgba(74,163,255,.30)'); glow.addColorStop(1,'rgba(74,163,255,0)');
+    ctx.fillStyle=glow; ctx.beginPath(); ctx.arc(cx,cy,earthPx*1.6,0,7); ctx.fill();
+
+    // danger band (atmosphere) — the "burn-up zone", drawn thick & reddish
+    const atmPx = earthPx * (R_ATM/R);
+    const band = ctx.createRadialGradient(cx,cy,earthPx, cx,cy,atmPx);
+    band.addColorStop(0,'rgba(255,120,60,.28)'); band.addColorStop(1,'rgba(255,90,90,0)');
+    ctx.fillStyle=band; ctx.beginPath(); ctx.arc(cx,cy,atmPx,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(255,120,80,.55)'; ctx.lineWidth=1.2; ctx.setLineDash([4,5]);
+    ctx.beginPath(); ctx.arc(cx,cy,atmPx,0,7); ctx.stroke(); ctx.setLineDash([]);
+
+    // ocean disk
+    const oc = ctx.createRadialGradient(cx-earthPx*0.3,cy-earthPx*0.35,earthPx*0.2, cx,cy,earthPx);
+    oc.addColorStop(0,'#3f86c9'); oc.addColorStop(0.6,'#1f5590'); oc.addColorStop(1,'#0a2444');
+    ctx.save(); ctx.beginPath(); ctx.arc(cx,cy,earthPx,0,7); ctx.clip();
+    ctx.fillStyle=oc; ctx.fillRect(cx-earthPx,cy-earthPx,earthPx*2,earthPx*2);
+    ctx.fillStyle='rgba(70,150,92,.85)';
+    const blobs=[[-.2,-.35,.5,.35],[.25,-.05,.45,.4],[-.35,.25,.4,.3],[.1,.4,.35,.25]];
+    for(const [bx,by,bw,bh] of blobs){
+      ctx.beginPath(); ctx.ellipse(cx+bx*earthPx, cy+by*earthPx, bw*earthPx*0.5, bh*earthPx*0.5, bx, 0,7); ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle='rgba(160,200,255,.35)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(cx,cy,earthPx,0,7); ctx.stroke();
+  }
+
+  function orbitColor(){
+    if(mode==='dive'||mode==='boom') return '#ff6a3c';
+    if(mode==='good') return starsWon>=3 ? '#57d38c' : '#4aa3ff';
+    return '#8ba0b4';
+  }
+  function drawOrbit(){
+    ctx.strokeStyle = orbitColor();
+    ctx.lineWidth = (mode==='good' && starsWon>=3) ? 2.6 : 2;
+    ctx.globalAlpha = (mode==='coast') ? 0.85 : 0.95;
+    if(mode==='coast'){ ctx.setLineDash([6,6]); } else { ctx.setLineDash([]); }
+    ctx.beginPath();
+    for(let i=0;i<=140;i++){
+      const th = i/140*2*Math.PI;
+      const r  = radiusAt(th), phi = omega+th;
+      const x=sx(r*Math.cos(phi)), y=sy(r*Math.sin(phi));
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+  }
+
+  function drawApsisMarks(){
+    // apogee (highest) marker + label
+    const rap = a*(1+e), pha = omega+Math.PI;
+    const ax=sx(rap*Math.cos(pha)), ay=sy(rap*Math.sin(pha));
+    ctx.fillStyle = (mode==='coast')?'#ffd27f':'rgba(255,210,127,.6)';
+    ctx.font='bold 12px -apple-system,sans-serif'; ctx.textAlign='center';
+    ctx.fillText('✦', ax, ay-8);
+    if(mode==='coast'){
+      ctx.fillStyle='rgba(255,210,127,.9)';
+      ctx.fillText(lang==='zh'?'最高点':'top', ax, ay-20);
+    }
+    // perigee (lowest) marker
+    const rp = a*(1-e), php = omega;
+    const px=sx(rp*Math.cos(php)), py=sy(rp*Math.sin(php));
+    ctx.fillStyle = rp<R_ATM ? 'rgba(255,90,90,.9)' : 'rgba(139,160,180,.8)';
+    ctx.beginPath(); ctx.arc(px,py,2.6,0,7); ctx.fill();
+  }
+
+  function drawCraft(){
+    if(mode==='boom') return;
+    const r=radiusAt(theta), phi=omega+theta;
+    const px=sx(r*Math.cos(phi)), py=sy(r*Math.sin(phi));
+    // prograde hint arrow while coasting
+    if(mode==='coast'){
+      const s=stateVec(); const sp=Math.hypot(s.vx,s.vy);
+      const ux=s.vx/sp, uy=-s.vy/sp; // screen y flipped
+      ctx.strokeStyle='rgba(255,140,66,.7)'; ctx.lineWidth=2; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+ux*18, py+uy*18); ctx.stroke();
+      ctx.fillStyle='rgba(255,140,66,.8)';
+      ctx.beginPath(); ctx.arc(px+ux*18,py+uy*18,3,0,7); ctx.fill();
+    }
+    // craft dot
+    ctx.save(); ctx.shadowColor= mode==='good'&&starsWon>=3?'#57d38c':'#ff8c42'; ctx.shadowBlur=14;
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(px,py,4.5,0,7); ctx.fill(); ctx.restore();
+    // success sparkle ring
+    if(sparkle>0){
+      ctx.strokeStyle='rgba(87,211,140,'+sparkle.toFixed(2)+')'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.arc(px,py,(1-sparkle)*40+6,0,7); ctx.stroke();
+    }
+  }
+
+  function drawParticles(){
+    for(const p of particles){
+      ctx.globalAlpha=Math.max(0,p.life);
+      ctx.fillStyle = p.hot ? '#fff2c0' : '#ff7a3c';
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r*p.life+0.5,0,7); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  function draw(){
+    ctx.save();
+    if(shake>0){ ctx.translate((Math.random()-0.5)*10*shake,(Math.random()-0.5)*10*shake); }
+    ctx.clearRect(-20,-20,W+40,H+40);
+    for(const s of stars){ ctx.globalAlpha=s.a; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.r,0,7); ctx.fill(); }
+    ctx.globalAlpha=1;
+    drawEarth();
+    drawOrbit();
+    drawApsisMarks();
+    drawCraft();
+    drawParticles();
+    ctx.restore();
+  }
+
+  // ---------- readout ----------
+  function posLabel(){
+    const t=T[lang];
+    const th=(theta%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+    const dApex=Math.abs(th-Math.PI);
+    const dPeri=Math.min(th, 2*Math.PI-th);
+    if(dApex < 0.20) return {txt:t.posApex, on:true};
+    if(dPeri < 0.20) return {txt:t.posPeri, on:false};
+    return { txt:(th<Math.PI? t.posUp : t.posDown), on:false };
+  }
+  function updateReadout(){
+    const r=radiusAt(theta);
+    altEl.textContent = Math.max(0, Math.round(r-R)).toLocaleString();
+    const pl=posLabel();
+    posEl.textContent = pl.txt;
+    posEl.className = 'chip' + (pl.on && mode==='coast' ? ' on' : '');
+    const rp=a*(1-e), ra=a*(1+e);
+    apsisEl.innerHTML = T[lang].apsis(Math.round(ra-R), Math.round(rp-R), rp<R_ATM);
+  }
+
+  // ---------- verdict ----------
+  function showVerdict(key){
+    const vd = T[lang].v[key];
+    verdictEl.className = 'verdict show ' + vd.cls;
+    const st = vd.st>0 ? '<span class="vstars stars">'+'★'.repeat(vd.st)+'☆'.repeat(3-vd.st)+'</span>' : '';
+    verdictEl.innerHTML = `<span class="tag">${vd.tag}</span>${vd.t}${st}`;
+    verdictEl._key = key;
+  }
+  function hideVerdict(){ verdictEl.className='verdict'; verdictEl._key=null; }
+
+  // ---------- badge ----------
+  function renderBadge(){
+    badgeEl.className = 'badge' + (earned?' earned':'');
+    badgeText.textContent = earned ? T[lang].badgeEarned : T[lang].badgeLocked;
+  }
+
+  // ---------- quiz ----------
+  let quizDone=false;
+  function buildQuiz(){
+    const t=T[lang];
+    document.getElementById('quizQ').innerHTML = t.quizQ;
+    const wrap=document.getElementById('choices'); wrap.innerHTML='';
+    const opts=[{k:'A',txt:t.c1,ok:false},{k:'B',txt:t.c2,ok:true}];
+    for(const o of opts){
+      const b=document.createElement('button'); b.className='choice';
+      b.innerHTML=`<span class="key">${o.k}</span><span>${o.txt}</span>`;
+      b.addEventListener('click',()=>{
+        if(quizDone) return; quizDone=true;
+        [...wrap.children].forEach(c=>c.classList.add('dim'));
+        b.classList.remove('dim');
+        b.classList.add(o.ok?'correct':'wrong');
+        if(!o.ok){ [...wrap.children].find(c=>c!==b).classList.remove('dim'); [...wrap.children].find(c=>c!==b).classList.add('correct'); }
+        document.getElementById('feedback').innerHTML = o.ok ? t.fbOk : t.fbNo;
+      });
+      wrap.appendChild(b);
+    }
+    document.getElementById('feedback').innerHTML='';
+    quizDone=false;
+  }
+
+  // ---------- static text ----------
+  function renderStatic(){
+    const t=T[lang];
+    document.getElementById('title').textContent = t.title;
+    document.getElementById('titleEn').textContent = t.titleEn;
+    document.getElementById('back').textContent = t.back;
+    document.getElementById('langBtn').textContent = t.lang;
+    document.getElementById('hook').innerHTML = t.hook;
+    burnBtn.textContent = t.burn;
+    retryBtn.textContent = t.retry;
+    promptEl.innerHTML = t.prompt;
+    document.documentElement.lang = lang;
+  }
+
+  // ---------- events ----------
+  burnBtn.addEventListener('click', burn);
+  canvas.addEventListener('click', ()=>{ if(mode==='coast') burn(); });
+  retryBtn.addEventListener('click', ()=>{ setInit(); });
+  document.getElementById('langBtn').addEventListener('click', ()=>{
+    lang = lang==='zh'?'en':'zh';
+    renderStatic(); renderBadge(); buildQuiz();
+    if(verdictEl._key) showVerdict(verdictEl._key);
+    updateReadout();
+  });
+  window.addEventListener('resize', resize);
+
+  // ---------- init ----------
+  renderStatic();
+  renderBadge();
+  buildQuiz();
+  setInit();
+  resize();
+  requestAnimationFrame(step);
+})();
+</script>
+</body>
+</html>

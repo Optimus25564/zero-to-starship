@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>甩掉包袱 · Drop the Deadweight</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  .seg{display:flex; gap:8px; margin-bottom:12px}
+  .seg button{flex:1; font-size:14px; padding:10px}
+  .seg button.on{background:linear-gradient(180deg,#ff9a4d,#e5651a); border-color:#ff9a4d; color:#1a0d02}
+  .sepwrap{margin-top:10px}
+  #sepBtn{background:linear-gradient(180deg,#ff5a5a,#c02b2b); border-color:#ff8a8a; color:#fff; font-size:18px;
+          animation:pulse 1s infinite}
+  #sepBtn:disabled{animation:none}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,90,90,.6)} 50%{box-shadow:0 0 0 10px rgba(255,90,90,0)}}
+  .stars{font-size:20px; letter-spacing:2px}
+  .mzone.sep{background:rgba(87,211,140,.35)}
+</style>
+</head>
+<body>
+  <header>
+    <div class="htitle"><h1 id="title">甩掉包袱</h1><span class="en" id="titleEn">Drop the Deadweight</span></div>
+    <div class="headright">
+      <a class="backlink" href="../index.html" id="back">← 目录</a>
+      <span class="langtoggle" id="langBtn">EN</span>
+    </div>
+  </header>
+
+  <p class="hook" id="hook"></p>
+
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="readout">
+      <span class="big" id="spd">0.0</span><span class="unit">km/s</span>
+      <span class="chip" id="goalChip"></span>
+      <span class="spacer"></span>
+      <span class="stars" id="stars"></span>
+    </div>
+    <div class="analogy" id="analogy"></div>
+
+    <div class="seg">
+      <button id="mode1" data-m="1">一级 1-stage</button>
+      <button id="mode2" data-m="2" class="on">两级 2-stage</button>
+    </div>
+
+    <div class="meters">
+      <div class="meter">
+        <div class="mlabel"><span id="gaugeLbl">一级燃料</span><span id="gaugePct">100%</span></div>
+        <div class="mbar"><div class="mfill" id="gaugeFill" style="width:100%"></div>
+          <div class="mzone sep" id="sepZone" style="right:0; width:0"></div></div>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button class="fire" id="launchBtn">点火发射</button>
+      <button class="ghost" id="retryBtn">重来</button>
+    </div>
+    <div class="buttons sepwrap">
+      <button class="fire" id="sepBtn" disabled>分离！</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="q" id="qText"></p>
+    <div class="choices" id="choices"></div>
+    <div class="feedback" id="feedback"></div>
+  </div>
+
+  <div class="badge" id="badge">
+    <span class="medal">🏅</span>
+    <span id="badgeText"></span>
+  </div>
+
+<script>
+(() => {
+  // ---------- two-stage rocket-equation model ----------
+  const VE=3400, PAY=15, F1=500, F2=150, KT=0.08, GOAL=9.4;
+  const dry1=KT*F1, dry2=KT*F2;
+  const M0_TOTAL = PAY+F2+dry2+F1+dry1;         // 717 t at liftoff
+  const M0_2 = PAY+F2+dry2, M1_2 = PAY+dry2;    // stage-2 start / dry
+  const DV2 = VE*Math.log(M0_2/M1_2)/1000;      // fixed second-stage Δv ≈ 6.39 km/s
+  const DV1_MAX = VE*Math.log(M0_TOTAL/(M0_TOTAL-F1))/1000; // ≈ 4.06 (burn all stage-1)
+  // single-stage (same total fuel, no separation) — hits the wall
+  const FT=F1+F2, dryT=KT*FT;
+  const DV_1STAGE = VE*Math.log((PAY+FT+dryT)/(PAY+dryT))/1000; // ≈ 8.06 < 9.4
+  // live speed from stage-1 fuel burned (tons)
+  const vFromBurn = b => VE*Math.log(M0_TOTAL/(M0_TOTAL-b))/1000;
+
+  const TB1=4.5, TB2=2.5, G_LOSS=0.35, COAST_MAX=3.2;
+
+  // ---------- i18n ----------
+  const T={
+    zh:{
+      title:'甩掉包袱', titleEn:'Drop the Deadweight', lang:'EN', back:'← 目录',
+      hook:'马斯克：翻墙的梯子——<b>烧完一截，扔掉一截</b>。空油箱是死重，背着它上天，等于背着空书包跑马拉松。烧光一级，就<b>由你亲手按下分离</b>。',
+      goalChip:'目标 9.4 km/s',
+      mode1:'一级 1-stage', mode2:'两级 2-stage',
+      gauge:'一级燃料', launch:'点火发射', retry:'重来', sep:'分离！',
+      analogyIdle:'两级：烧光一级燃料的<b>那一刻</b>按分离最划算——早了浪费燃料，晚了背死重。',
+      analogy1:'一级：所有燃料一节装。看它会不会撞上 9.4 的墙。',
+      analogyRun:(v)=>`当前速度 <b>${v.toFixed(1)}</b> km/s`,
+      qText:'两级好，那分 10 级岂不更好？',
+      choices:[
+        {k:'A', txt:'级数越多越快，分 10 级最好', correct:false},
+        {k:'B', txt:'每多一级就多一套发动机/外壳/分离机构（全是重量），还多一次失败风险', correct:true},
+      ],
+      fbWrong:'想想看——每一级都要自带发动机和外壳。',
+      fbRight:'对。分级能扔死重，但<b>每多一级</b>就多一套发动机、外壳、分离机构（都是重量），还多一次分离失败的风险。真火箭一般 2–3 级，是<b>平衡</b>出来的。',
+      badgeLocked:'徽章未解锁：亲手分离、冲破 9.4 入轨，即可获得「分离指挥官」。',
+      badgeEarned:'已获得徽章「分离指挥官」——扔掉空油箱那一下，就是翻过数学之墙的梯子。',
+      v:{
+        wall:{tag:'又撞墙了', t:`一级到顶只有 <b>${DV_1STAGE.toFixed(1)}</b> km/s，还是翻不过 9.4。空油箱一直背在身上。`},
+        early:(w)=>({tag:'分离太早', t:`一级还剩 <b>${w}%</b> 燃料就被你扔了——白烧的钱。速度不够，掉回大气层。`}),
+        late:{tag:'分离太晚', t:'一级早烧空了，你还背着它——空油箱是死重，重力把速度一点点拖走。'},
+        never:{tag:'忘了分离', t:'你没按分离！背着空油箱当死重一路飞，永远翻不过 9.4。'},
+        meme:'<br><small>炸了？又一份数据。 / Boom? Another data point.</small>',
+        orbit3:{tag:'完美入轨 🛰️', t:`神级手感！分离正卡在燃料烧光那一刻，最终 <b>{v}</b> km/s，稳稳入轨！`},
+        orbit2:{tag:'入轨成功 🛰️', t:`成功！最终 <b>{v}</b> km/s 冲破了 9.4。分离时机再准一点点就满星了。`},
+        orbit1:{tag:'险险入轨 🛰️', t:`险过！<b>{v}</b> km/s，刚好越过 9.4。分离早/晚了些，浪费了一点速度。`},
+      }
+    },
+    en:{
+      title:'Drop the Deadweight', titleEn:'甩掉包袱', lang:'中', back:'← Menu',
+      hook:'Musk: the ladder over the wall — <b>burn a piece, drop a piece</b>. An empty tank is deadweight; carrying it to orbit is like running a marathon with an empty backpack. When stage 1 burns out, <b>YOU press SEPARATE</b>.',
+      goalChip:'Goal 9.4 km/s',
+      mode1:'1-stage', mode2:'2-stage',
+      gauge:'Stage-1 fuel', launch:'IGNITE', retry:'Retry', sep:'SEPARATE!',
+      analogyIdle:'2-stage: separate at the <b>instant</b> stage-1 fuel runs dry — too early wastes fuel, too late carries deadweight.',
+      analogy1:'1-stage: all the fuel in one piece. Watch it hit the 9.4 wall.',
+      analogyRun:(v)=>`Speed now <b>${v.toFixed(1)}</b> km/s`,
+      qText:'Two stages are good — so wouldn\'t 10 stages be even better?',
+      choices:[
+        {k:'A', txt:'More stages = faster; 10 stages is best', correct:false},
+        {k:'B', txt:'Each extra stage adds an engine/shell/separator (all weight) and one more chance to fail', correct:true},
+      ],
+      fbWrong:'Think — every stage needs its own engine and shell.',
+      fbRight:'Right. Staging sheds deadweight, but <b>each extra stage</b> adds an engine, a shell, a separator (all weight) and another chance the separation fails. Real rockets use 2–3 stages — it\'s a <b>balance</b>.',
+      badgeLocked:'Badge locked: separate by hand and break past 9.4 to earn "Separation Commander".',
+      badgeEarned:'Badge earned: "Separation Commander" — dropping that empty tank is the ladder over the math wall.',
+      v:{
+        wall:{tag:'Hit the wall again', t:`One stage tops out at only <b>${DV_1STAGE.toFixed(1)}</b> km/s — still short of 9.4. The empty tank rode along the whole way.`},
+        early:(w)=>({tag:'Separated too early', t:`You dumped stage 1 with <b>${w}%</b> fuel still in it — wasted money. Too slow, falls back into the atmosphere.`}),
+        late:{tag:'Separated too late', t:'Stage 1 ran dry long ago and you kept carrying it — the empty tank is deadweight, and gravity bled your speed away.'},
+        never:{tag:'Forgot to separate', t:'You never pressed SEPARATE! Hauling an empty tank as deadweight, you never clear 9.4.'},
+        meme:'<br><small>炸了？又一份数据。 / Boom? Another data point.</small>',
+        orbit3:{tag:'Perfect orbit 🛰️', t:`God-tier timing! You separated right as the fuel ran dry — final <b>{v}</b> km/s, clean insertion!`},
+        orbit2:{tag:'In orbit 🛰️', t:`Success! Final <b>{v}</b> km/s broke past 9.4. A touch more precise and it\'s three stars.`},
+        orbit1:{tag:'Barely orbit 🛰️', t:`Just made it! <b>{v}</b> km/s, squeaked over 9.4. Your timing was a bit early/late — some speed wasted.`},
+      }
+    }
+  };
+  let lang='zh';
+
+  // ---------- DOM ----------
+  const $=id=>document.getElementById(id);
+  const canvas=$('c'), ctx=canvas.getContext('2d');
+  const spdEl=$('spd'), goalChip=$('goalChip'), starsEl=$('stars'), analogyEl=$('analogy');
+  const gaugeFill=$('gaugeFill'), gaugePct=$('gaugePct'), sepZone=$('sepZone');
+  const launchBtn=$('launchBtn'), retryBtn=$('retryBtn'), sepBtn=$('sepBtn'), verdictEl=$('verdict');
+  const badgeEl=$('badge'), badgeText=$('badgeText');
+
+  // ---------- state ----------
+  let mode=2, earned=false;
+  try{ earned=localStorage.getItem('mg.badge.staging')==='1'; }catch(e){}
+  // sim state
+  let sim=null; // {phase,t,burned,v,vAtSep,added,sepFall,sepRot,boom,fx,alt,starScroll,tumble,coastT,wasteFrac}
+
+  // ---------- canvas ----------
+  let W=0,H=0,dpr=1; const stars=[];
+  function resize(){
+    const r=canvas.getBoundingClientRect();
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    W=r.width; H=r.height; canvas.width=W*dpr; canvas.height=H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(stars.length===0) for(let i=0;i<120;i++) stars.push({x:Math.random(),y:Math.random(),r:Math.random()*1.3+.3,a:Math.random()*.7+.2});
+    draw();
+  }
+
+  // ---------- drawing ----------
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // sky gradient: ground->space depending on altitude
+    const alt = sim? sim.alt : 0;         // 0..1 “how high”
+    const sky=ctx.createLinearGradient(0,0,0,H);
+    const top = mix('#02030a','#02030a',1);
+    sky.addColorStop(0,'#02030a');
+    sky.addColorStop(1, mix('#1a3a66','#02030a', Math.min(1,alt*1.3)));
+    ctx.fillStyle=sky; ctx.fillRect(0,0,W,H);
+    // stars scroll down as we climb
+    const sc=sim? sim.starScroll:0;
+    for(const s of stars){ let y=((s.y+sc)%1)*H; ctx.globalAlpha=s.a*(0.4+0.6*alt); ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s.x*W,y,s.r,0,7); ctx.fill(); }
+    ctx.globalAlpha=1;
+    // ground (only when low)
+    if(alt<0.35){ ctx.globalAlpha=1-alt/0.35; ctx.fillStyle='#141b2c'; ctx.fillRect(0,H-24,W,24);
+      ctx.fillStyle='#0c1120'; ctx.fillRect(0,H-24,W,4); ctx.globalAlpha=1; }
+
+    const cx=W/2, cy=H*0.56;
+    // fireworks on orbit
+    if(sim && sim.phase==='orbit'){ drawFireworks(sim.fx); }
+    // falling stage-1 (after separation)
+    if(sim && sim.sepFall>0 && mode===2){
+      ctx.save(); ctx.translate(cx, cy+44+sim.sepFall); ctx.rotate(sim.sepRot);
+      ctx.globalAlpha=Math.max(0,1-sim.sepFall/240);
+      drawStage1(0,0,false); ctx.restore();
+    }
+    // main vehicle
+    if(sim && sim.phase==='boom'){
+      drawBoom(cx, cy, sim.boom, sim.tumble);
+    } else if(sim){
+      const flame = (sim.phase==='ascent1'||sim.phase==='ascent2') ;
+      drawVehicle(cx, cy, flame, sim);
+    } else {
+      drawVehicle(cx, cy, false, null);
+    }
+  }
+  function mix(a,b,t){ // hex mix
+    const pa=[parseInt(a.slice(1,3),16),parseInt(a.slice(3,5),16),parseInt(a.slice(5,7),16)];
+    const pb=[parseInt(b.slice(1,3),16),parseInt(b.slice(3,5),16),parseInt(b.slice(5,7),16)];
+    const c=pa.map((v,i)=>Math.round(v+(pb[i]-v)*t));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
+  }
+  function drawStage2(x,y){ // upper stage + payload (nose)
+    ctx.fillStyle='#e6ebf2';
+    ctx.beginPath(); ctx.moveTo(x,y-46); ctx.lineTo(x+11,y-24); ctx.lineTo(x+11,y+8); ctx.lineTo(x-11,y+8); ctx.lineTo(x-11,y-24); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#ff8c42'; ctx.beginPath(); ctx.moveTo(x,y-46); ctx.lineTo(x+11,y-24); ctx.lineTo(x-11,y-24); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#4aa3ff'; ctx.fillRect(x-6,y-18,12,7); // window band
+  }
+  function drawStage1(x,y,attached){ // booster
+    ctx.fillStyle='#c7ccd3';
+    ctx.beginPath(); ctx.moveTo(x-12,y-8); ctx.lineTo(x+12,y-8); ctx.lineTo(x+12,y+40); ctx.lineTo(x-12,y+40); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#8ba0b4'; // fins
+    ctx.beginPath(); ctx.moveTo(x-12,y+40); ctx.lineTo(x-20,y+50); ctx.lineTo(x-12,y+30); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x+12,y+40); ctx.lineTo(x+20,y+50); ctx.lineTo(x+12,y+30); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='#2b303a'; ctx.lineWidth=1.5; ctx.strokeRect(x-12,y-8,24,48);
+  }
+  function drawVehicle(x,y,flame,s){
+    // stage 1 present unless separated in 2-stage mode
+    const s1present = (mode===1) || !(s && (s.phase==='ascent2'||s.phase==='orbit'||s.sepFall>0));
+    if(flame){
+      const s2only = s && s.phase==='ascent2';
+      const fy = y + (s1present?52:16);
+      const len = 22+Math.random()*16;
+      const g=ctx.createLinearGradient(0,fy,0,fy+len);
+      g.addColorStop(0,'#fff'); g.addColorStop(.4,'#ffd27f'); g.addColorStop(1,'rgba(255,140,66,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.moveTo(x-7,fy); ctx.lineTo(x+7,fy); ctx.lineTo(x,fy+len); ctx.closePath(); ctx.fill();
+    }
+    if(s1present) drawStage1(x,y+12,true);
+    drawStage2(x,y);
+  }
+  function drawBoom(x,y,b,tumble){
+    // tumbling debris + puff
+    const R=8+b*70;
+    ctx.save(); ctx.globalAlpha=Math.max(0,1-b*0.9);
+    const g=ctx.createRadialGradient(x,y,3,x,y,R);
+    g.addColorStop(0,'#fff'); g.addColorStop(.4,'#ffd27f'); g.addColorStop(.8,'#ff8c42'); g.addColorStop(1,'rgba(255,140,66,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,R,0,7); ctx.fill();
+    ctx.restore();
+  }
+  function drawFireworks(fx){
+    for(const p of fx){
+      ctx.globalAlpha=Math.max(0,1-p.life);
+      ctx.fillStyle=p.c; ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.4, 0,7); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ---------- simulation loop ----------
+  let raf=null, last=0;
+  function startLoop(){ if(raf) return; last=performance.now(); raf=requestAnimationFrame(loop); }
+  function stopLoop(){ if(raf) cancelAnimationFrame(raf); raf=null; }
+  function loop(now){
+    const dt=Math.min(0.05,(now-last)/1000); last=now;
+    if(sim) update(dt);
+    draw();
+    if(sim && sim.phase!=='done' && sim.phase!=='wallcoast') raf=requestAnimationFrame(loop);
+    else if(sim && (sim.phase==='orbit')) raf=requestAnimationFrame(loop); // keep fireworks
+    else raf=requestAnimationFrame(loop);
+  }
+  function update(dt){
+    const s=sim;
+    // climb feel
+    if(s.phase==='ascent1'||s.phase==='ascent2'||s.phase==='coast'||s.phase==='wallcoast'){
+      s.alt=Math.min(1, s.alt + dt*0.14);
+      s.starScroll=(s.starScroll + dt*(0.05+s.v*0.02))%1;
+    }
+    if(s.phase==='ascent1'){
+      s.t+=dt;
+      s.burned=Math.min(F1, F1*s.t/TB1);
+      s.v=vFromBurn(s.burned);
+      updateGauge((F1-s.burned)/F1);
+      if(s.burned>=F1-1e-6){
+        if(mode===1){ s.phase='wallcoast'; s.coastT=0; }
+        else { s.phase='coast'; s.coastT=0; }
+      }
+    } else if(s.phase==='coast'){
+      s.coastT+=dt; s.v=Math.max(0, s.v - G_LOSS*dt);
+      updateGauge(0);
+      if(s.coastT>COAST_MAX){ // never separated
+        endFail('never');
+      }
+    } else if(s.phase==='wallcoast'){ // single stage: coast then fall
+      s.coastT+=dt; s.v=Math.max(0, s.v - G_LOSS*dt);
+      if(s.coastT>1.0){ endFail('wall'); }
+    } else if(s.phase==='sepslow'){ // slow-mo separation
+      s.t+=dt; s.sepFall+=dt*60*0.35; s.sepRot+=dt*0.6;
+      if(s.t>1.1){ s.phase='ascent2'; s.t=0; }
+    } else if(s.phase==='ascent2'){
+      s.t+=dt; const add=(DV2/TB2)*dt; s.added+=add; s.v+=add;
+      s.sepFall+=dt*120;
+      if(s.added>=DV2-1e-6){ finishFlight(); }
+    } else if(s.phase==='boom'){
+      s.boom+=dt*1.1; s.tumble+=dt; s.alt=Math.max(0,s.alt-dt*0.1);
+      if(s.boom>=1){ s.phase='done'; }
+    } else if(s.phase==='orbit'){
+      for(const p of s.fx){ p.x+=p.vx; p.y+=p.vy; p.vy+=0.03; p.life+=dt*0.5; }
+      if(Math.random()<0.05) spawnFirework();
+    }
+    spdEl.textContent=s.v.toFixed(1);
+    spdEl.style.color = s.v>=GOAL?'#57d38c':'#ffd27f';
+    analogyEl.innerHTML=T[lang].analogyRun(s.v);
+  }
+
+  function updateGauge(frac){
+    frac=Math.max(0,Math.min(1,frac));
+    gaugeFill.style.width=(frac*100)+'%';
+    gaugeFill.className='mfill'+(frac<0.08?' bad':'');
+    gaugePct.textContent=Math.round(frac*100)+'%';
+  }
+
+  // ---------- launch / separate ----------
+  function launch(){
+    if(sim && sim.phase!=='done' && sim.phase!=='orbit' && sim.phase!=='boom') return;
+    hideVerdict(); starsEl.textContent='';
+    sim={phase:'ascent1', t:0, burned:0, v:0, vAtSep:0, added:0, sepFall:0, sepRot:0, boom:0, tumble:0, alt:0, starScroll:0, coastT:0, wasteFrac:0, fx:[]};
+    launchBtn.disabled=true;
+    updateGauge(1);
+    if(mode===2){ sepBtn.disabled=false; }
+    startLoop();
+  }
+  function separate(){
+    if(!sim || mode!==2) return;
+    if(sim.phase!=='ascent1' && sim.phase!=='coast') return;
+    sepBtn.disabled=true;
+    // waste = leftover stage-1 fuel fraction (only if pressed during burn)
+    sim.wasteFrac = sim.phase==='ascent1' ? (F1-sim.burned)/F1 : 0;
+    sim.vAtSep=sim.v;
+    sim.phase='sepslow'; sim.t=0;
+  }
+  function finishFlight(){
+    const s=sim; const v=s.v;
+    if(v>=GOAL){
+      // stars by precision
+      const stars = v>=10.25?3 : v>=9.8?2 : 1;
+      endOrbit(v, stars);
+    } else {
+      // reason: early waste vs late coast
+      if(s.wasteFrac>0.02) endFail('early', Math.round(s.wasteFrac*100), v);
+      else endFail('late', 0, v);
+    }
+  }
+
+  function endOrbit(v, nStars){
+    sim.phase='orbit'; sim.fx=[];
+    for(let i=0;i<40;i++) spawnFirework();
+    const V=T[lang].v;
+    const key = nStars>=3?'orbit3':nStars>=2?'orbit2':'orbit1';
+    verdictEl.className='verdict show ok';
+    verdictEl.innerHTML=`<span class="tag">${V[key].tag}</span>${V[key].t.replace('{v}',v.toFixed(1))}`;
+    starsEl.textContent='★★★☆☆☆'.slice(3-nStars,6-nStars);
+    launchBtn.disabled=false; sepBtn.disabled=true;
+    if(!earned){ earned=true; try{ localStorage.setItem('mg.badge.staging','1'); }catch(e){} }
+    renderBadge();
+  }
+  function endFail(kind, arg, v){
+    sim.phase='boom'; sim.boom=0;
+    const V=T[lang].v;
+    let o;
+    if(kind==='wall') o=V.wall;
+    else if(kind==='early') o=V.early(arg);
+    else if(kind==='late') o=V.late;
+    else o=V.never;
+    verdictEl.className='verdict show bad';
+    verdictEl.innerHTML=`<span class="tag">${o.tag}</span>${o.t}${V.meme}`;
+    starsEl.textContent='';
+    launchBtn.disabled=false; sepBtn.disabled=true;
+  }
+
+  function spawnFirework(){
+    if(!sim) return;
+    const cx=W/2, cy=H*0.4;
+    const ang=Math.random()*7, sp=1+Math.random()*2.4;
+    const cols=['#ffd27f','#ff8c42','#4aa3ff','#57d38c','#ff5a5a'];
+    sim.fx.push({x:cx+(Math.random()-.5)*W*0.5, y:cy+(Math.random()-.5)*H*0.3, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp-1, c:cols[(Math.random()*cols.length)|0], life:0});
+    if(sim.fx.length>140) sim.fx.splice(0,40);
+  }
+
+  function showWall(){}
+  function hideVerdict(){ verdictEl.className='verdict'; }
+
+  // ---------- mode / reset ----------
+  function setMode(m){
+    mode=m;
+    $('mode1').classList.toggle('on', m===1);
+    $('mode2').classList.toggle('on', m===2);
+    // separation window zone only in 2-stage
+    sepZone.style.width = m===2 ? '8%' : '0';
+    reset();
+  }
+  function reset(){
+    stopSimSoft();
+    sim=null; updateGauge(1); hideVerdict(); starsEl.textContent='';
+    spdEl.textContent='0.0'; spdEl.style.color='#ffd27f';
+    launchBtn.disabled=false; sepBtn.disabled=true;
+    analogyEl.innerHTML = mode===2? T[lang].analogyIdle : T[lang].analogy1;
+    draw();
+  }
+  function stopSimSoft(){ /* keep rAF running for idle draw */ }
+
+  // ---------- quiz ----------
+  let quizDone=false, quizPick=-1;
+  function renderQuiz(){
+    const t=T[lang];
+    $('qText').textContent=t.qText;
+    const box=$('choices'); box.innerHTML='';
+    t.choices.forEach((c,i)=>{
+      const b=document.createElement('button'); b.className='choice';
+      b.innerHTML=`<span class="key">${c.k}</span><span>${c.txt}</span>`;
+      b.addEventListener('click',()=>pickQuiz(i));
+      box.appendChild(b);
+    });
+    if(quizDone) applyQuiz();
+    $('feedback').innerHTML = quizDone ? (T[lang].choices[quizPick].correct?T[lang].fbRight:T[lang].fbWrong) : '';
+  }
+  function pickQuiz(i){ quizDone=true; quizPick=i; applyQuiz();
+    $('feedback').innerHTML = T[lang].choices[i].correct?T[lang].fbRight:T[lang].fbWrong; }
+  function applyQuiz(){
+    const t=T[lang], btns=$('choices').children;
+    [...btns].forEach((b,j)=>{ b.classList.remove('correct','wrong');
+      if(t.choices[j].correct) b.classList.add('correct');
+      if(j===quizPick && !t.choices[j].correct) b.classList.add('wrong'); });
+  }
+
+  // ---------- render text ----------
+  function renderStatic(){
+    const t=T[lang];
+    $('title').textContent=t.title; $('titleEn').textContent=t.titleEn;
+    $('langBtn').textContent=t.lang; $('back').textContent=t.back;
+    $('hook').innerHTML=t.hook; $('goalChip').textContent=t.goalChip;
+    $('mode1').textContent=t.mode1; $('mode2').textContent=t.mode2;
+    $('gaugeLbl').textContent=t.gauge; $('launchBtn').textContent=t.launch;
+    $('retryBtn').textContent=t.retry; $('sepBtn').textContent=t.sep;
+    if(!sim) analogyEl.innerHTML = mode===2? t.analogyIdle : t.analogy1;
+    document.documentElement.lang=lang;
+    renderQuiz();
+  }
+  function renderBadge(){
+    badgeEl.className='badge'+(earned?' earned':'');
+    badgeText.textContent = earned?T[lang].badgeEarned:T[lang].badgeLocked;
+  }
+
+  // ---------- events ----------
+  $('mode1').addEventListener('click',()=>setMode(1));
+  $('mode2').addEventListener('click',()=>setMode(2));
+  launchBtn.addEventListener('click',launch);
+  sepBtn.addEventListener('click',separate);
+  retryBtn.addEventListener('click',reset);
+  $('langBtn').addEventListener('click',()=>{ lang=lang==='zh'?'en':'zh'; renderStatic(); renderBadge(); });
+  window.addEventListener('resize',resize);
+
+  // ---------- init ----------
+  renderStatic(); renderBadge(); setMode(2); resize();
+  startLoop();
+})();
+</script>
+</body>
+</html>

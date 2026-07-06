@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>发射总监 · Launch Director</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  /* game-specific bits common.css lacks (palette reused from CSS vars) */
+  .clockrow{display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:4px}
+  .clocklabel{font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase}
+  .clock{font-size:42px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--flame2); letter-spacing:2px}
+  .clock.hold{color:var(--half)} .clock.bad{color:var(--bad)} .clock.go{color:var(--ok)}
+
+  .lights{display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 4px}
+  .light{display:flex; align-items:center; gap:6px; background:var(--panel2); border:1px solid var(--line);
+         border-radius:999px; padding:6px 11px; font-size:12px; color:var(--muted)}
+  .light .dot{width:12px; height:12px; border-radius:50%; background:var(--ok); box-shadow:0 0 8px var(--ok)}
+  .light.caution{color:var(--ink); border-color:var(--half)}
+  .light.caution .dot{background:var(--half); box-shadow:0 0 9px var(--half); animation:blink 1s infinite}
+  .light.fault{color:var(--ink); border-color:var(--bad)}
+  .light.fault .dot{background:var(--bad); box-shadow:0 0 11px var(--bad)}
+  @keyframes blink{50%{opacity:.35}}
+
+  .eventcard{margin-top:8px; border-top:1px solid var(--line); padding-top:12px}
+  .eventcard .q b{color:var(--flame2)}
+  .btn-go{background:linear-gradient(180deg,#5fe0a0,#2f9e63); border-color:#5fe0a0; color:#04140a}
+  .btn-hold{background:linear-gradient(180deg,#ffd97a,#e0a92e); border-color:#ffd97a; color:#1a1403}
+  .btn-scrub{background:linear-gradient(180deg,#ff7a7a,#c23838); border-color:#ff7a7a; color:#1a0303}
+  .hint{font-size:12px; color:var(--muted); margin:8px 0 0; line-height:1.5}
+</style>
+</head>
+<body>
+  <header>
+    <div class="htitle"><h1 id="title">发射总监</h1><span class="en" id="titleEn">Launch Director</span></div>
+    <div class="headright">
+      <a class="backlink" href="../index.html" id="back">← 目录</a>
+      <span class="langtoggle" id="langBtn">EN</span>
+    </div>
+  </header>
+
+  <p class="hook" id="hook"></p>
+
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="clockrow">
+      <span class="clocklabel" id="clockLabel">发射倒计时</span>
+      <span class="clock" id="clock">T-03:00</span>
+    </div>
+    <div class="lights" id="lights"></div>
+
+    <div class="eventcard hidden" id="eventCard">
+      <p class="q" id="eventQ"></p>
+      <div class="buttons">
+        <button class="btn-go" id="goBtn">继续 GO</button>
+        <button class="btn-hold" id="holdBtn">暂停 HOLD</button>
+        <button class="btn-scrub" id="scrubBtn">中止 SCRUB</button>
+      </div>
+    </div>
+
+    <div class="buttons" id="controls">
+      <button class="fire" id="startBtn">开始倒数</button>
+      <button class="ghost hidden" id="restartBtn">再来一次</button>
+    </div>
+    <p class="hint" id="hint"></p>
+  </div>
+
+  <div class="panel hidden" id="quizPanel">
+    <p class="q" id="quizQ"></p>
+    <div class="choices" id="quizChoices"></div>
+    <div class="feedback" id="quizFb"></div>
+  </div>
+
+  <div class="badge" id="badge">
+    <span class="medal">🏅</span>
+    <span id="badgeText"></span>
+  </div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------------- i18n ----------------
+  const MEME = "炸了？又一份数据。/ Boom? Another data point.";
+  const HALF_COST_ZH = "过度谨慎也有代价：错过今天的窗口，客户的卫星晚一周上天。 / Being over-cautious has a cost: you miss today's window; the customer's satellite flies a week late.";
+  const HALF_COST_EN = HALF_COST_ZH;
+
+  const T = {
+    zh: {
+      title:'发射总监', titleEn:'Launch Director', lang:'EN', back:'← 目录',
+      hook:'马斯克：<b>你以为发射就是按红按钮？敢喊停的工程师，才是好工程师。</b> 六盏状态灯、一个倒数钟，全归你管。看清楚再喊：继续、暂停，还是中止？',
+      clockLabel:'发射倒计时',
+      go:'继续 GO', hold:'暂停 HOLD', scrub:'中止 SCRUB',
+      start:'开始倒数', restart:'再来一次',
+      hint:'点「开始倒数」。倒数中会不断有情况弹出，钟会自动停下等你决定。别急——多数问题只要<b>暂停</b>等它过去；真出故障就得<b>中止</b>。',
+      lights:{ fuel:'燃料', weather:'天气', sea:'海域', engine:'发动机', software:'软件', recovery:'回收船' },
+      events:{
+        fuel:'推进剂加注完成，储箱压力正常，六盏灯全绿。要继续倒数吗？',
+        weather:'高空出现风切变，高空风速<b>超标</b>。要放飞吗？',
+        recovery:'海上回收平台还没开到指定海域，<b>回收船未就位</b>。',
+        sea:'一艘渔船<b>闯进了警戒海域</b>，正好在火箭航线下方。',
+        software:'箭上<b>遥测数据开始丢包</b>，地面读数断断续续。',
+        engine:'<b>2 号发动机</b>燃烧室压力偏低，比正常值低了一截。'
+      },
+      results:{
+        fuelGo:{tag:'✓ 正常', t:'燃料一切绿灯，没有理由停。继续倒数。'},
+        fuelHold:{tag:'多看一眼', t:'你又核对了一遍燃料读数——谨慎没坏处。继续倒数。'},
+        fuelScrub:{tag:'过度谨慎', t:'六盏灯全绿你却中止了整场发射？没有故障就喊停，是另一种浪费。<br><small>'+HALF_COST_ZH+'</small>'},
+        resolve:{
+          weather:{tag:'✓ 好决定', t:'你按住倒数，等了几分钟——高空风降回安全范围。恢复倒数。<small> 会吹走的风，等一等就行。</small>'},
+          recovery:{tag:'✓ 稳', t:'你暂停倒数，回收船全速赶到指定海域、就位。恢复倒数。<small> 火箭飞上去，一级还得飞回来降在船上。</small>'},
+          sea:{tag:'✓ 对', t:'你叫停倒数，海警把渔船请出警戒区，海域清空。恢复倒数。<small> 头顶有火箭飞过，下面绝不能有人。</small>'},
+          software:{tag:'✓ 处理得当', t:'你暂停几秒，遥测重新锁定，数据恢复正常。恢复倒数。<small> 看不清火箭状态时，绝不硬着头皮点火。</small>'}
+        },
+        half:{
+          weather:{tag:'过度谨慎', t:'这点高空风，暂停几分钟等它过去就行，不必直接中止整场发射。<br><small>'+HALF_COST_ZH+'</small>'},
+          recovery:{tag:'过度谨慎', t:'回收船只是晚到一会儿，暂停等它就位即可，用不着中止发射。<br><small>'+HALF_COST_ZH+'</small>'},
+          sea:{tag:'过度谨慎', t:'一条渔船，暂停等它驶离警戒区就行，不必中止整场发射。<br><small>'+HALF_COST_ZH+'</small>'},
+          software:{tag:'可以理解', t:'遥测丢包时选择中止，是稳妥、能理解的做法——不算错。不过其实暂停几秒重新锁定信号就够了。<br><small>'+HALF_COST_ZH+'</small>'}
+        },
+        boom:{
+          weather:{tag:'炸了', t:'你在超标强风里放飞。火箭冲进最大动压区，被高空风一把撕开。<small> 会吹走的风，你却赔上了整枚火箭。</small><br><b>'+MEME+'</b>'},
+          recovery:{tag:'炸了', t:'回收船没就位你也放飞。一级返场时无处可降，一头栽进海里报废。<small> 还没起飞就注定丢掉回收——本可以等它就位。</small><br><b>'+MEME+'</b>'},
+          sea:{tag:'炸了', t:'警戒区里有渔船你也放飞。火箭偏出安全走廊、飞近有人的海域，安全官只能按下自毁。<small> 头顶有火箭时，海里绝不能有人——这是铁律。</small><br><b>'+MEME+'</b>'},
+          software:{tag:'炸了', t:'读数都断断续续了你还放飞。飞行中一处异常没被及时发现，火箭失控解体。<small> 看不清仪表就别开车——火箭更是如此。</small><br><b>'+MEME+'</b>'},
+          engine:{tag:'炸了', t:'你放飞了一台带病的发动机。升空 20 秒，2 号机彻底失压熄火，火箭失去平衡、空中解体。<small> 发动机有问题就绝不上天——这是铁律。</small><br><b>'+MEME+'</b>'}
+        },
+        engineHold:{tag:'太晚了', t:'T-15 秒暂停也没用——压力还在往下掉，等不回来，最后仍得中止，白白耗掉今天的窗口。<br><small>'+HALF_COST_ZH+'</small>'},
+        engineCaught:{tag:'漂亮的中止', t:'T-15 秒你果断喊停！2 号发动机确实有隐患——<b>你刚刚拦下了一次可能的爆炸。</b>'},
+        success:{tag:'完美发射 🚀', t:'地面团队连夜换掉 2 号发动机。两天后重新倒数，六盏灯全绿……<b>T-10、9、8… 点火… 升空！</b><br><small>你是个真正的发射总监——<b>知道什么时候该喊停</b>。</small>'}
+      },
+      callout:{ ignition:'点火 IGNITION', liftoff:'升空！LIFTOFF!' },
+      stampHalf:'SCRUBBED', stampSafe:'SAFE',
+      quiz:{
+        q:'T-1 秒，电脑检测到发动机异常，自动中止了这次发射。这次发射应该算——',
+        choices:[
+          {text:'失败，白忙一场 ❌', correct:false},
+          {text:'成功——安全系统正在工作，它拦下了一次可能的爆炸 ✅', correct:true}
+        ],
+        fbCorrect:'对！自动中止不是失败，而是<b>安全系统在替你踩刹车</b>。它用一次“没发射”，换掉了一次“可能的爆炸”。真正的失败，是本该停却硬要飞。',
+        fbWrong:'再想想：发动机带病硬飞，多半空中解体。电脑在 T-1 秒喊停，正是<b>安全系统成功工作</b>——它拦下一次可能的爆炸。这是成功，不是失败。'
+      },
+      badgeLocked:'徽章未解锁：当一次合格的发射总监——该等就等、该停就停，即可获得「发射总监」。',
+      badgeEarned:'已获得徽章「发射总监」——最好的工程师，敢在 T-0 之前喊停。'
+    },
+    en: {
+      title:'Launch Director', titleEn:'发射总监', lang:'中', back:'← Menu',
+      hook:'Musk: <b>You think launching is just hitting the red button? The engineer who dares to call HOLD is the good engineer.</b> Six status lights, one countdown clock — all yours. Look, then call it: GO, HOLD, or SCRUB?',
+      clockLabel:'Countdown',
+      go:'GO', hold:'HOLD', scrub:'SCRUB',
+      start:'Start countdown', restart:'Try again',
+      hint:'Hit “Start countdown.” Situations will pop up as the clock ticks down — it auto-pauses for your call. Don’t panic — most issues just need a <b>HOLD</b> until they clear; a real fault needs a <b>SCRUB</b>.',
+      lights:{ fuel:'Fuel', weather:'Weather', sea:'Sea', engine:'Engine', software:'Software', recovery:'Recovery ship' },
+      events:{
+        fuel:'Propellant load complete, tank pressures nominal, all six lights green. Continue the count?',
+        weather:'High-altitude wind shear — upper-level winds are <b>out of limits</b>. Fly through it?',
+        recovery:'The sea-based recovery platform hasn’t reached its station yet — <b>recovery ship not in position</b>.',
+        sea:'A fishing boat has <b>entered the exclusion zone</b>, right under the flight path.',
+        software:'Onboard <b>telemetry is dropping packets</b> — ground readings are flickering.',
+        engine:'<b>Engine 2</b> chamber pressure is running low, noticeably below nominal.'
+      },
+      results:{
+        fuelGo:{tag:'✓ Nominal', t:'Fuel is all green — no reason to stop. Continue the count.'},
+        fuelHold:{tag:'Double-checked', t:'You re-verified the fuel readings — no harm in being careful. Continue the count.'},
+        fuelScrub:{tag:'Over-cautious', t:'All six lights green, and you scrubbed the whole launch? Stopping with no fault is its own kind of waste.<br><small>'+HALF_COST_EN+'</small>'},
+        resolve:{
+          weather:{tag:'✓ Good call', t:'You held the count, waited a few minutes — the upper winds dropped back into limits. Count resumes.<small> Wind that blows through just needs a little wait.</small>'},
+          recovery:{tag:'✓ Solid', t:'You held the count; the recovery ship raced to station and locked in. Count resumes.<small> The rocket flies up — but the booster still has to fly back and land on that ship.</small>'},
+          sea:{tag:'✓ Right', t:'You held the count; the coast guard cleared the boat out of the zone. Count resumes.<small> With a rocket overhead, there must be nobody below.</small>'},
+          software:{tag:'✓ Handled well', t:'You paused a few seconds; telemetry re-locked and data went clean. Count resumes.<small> Never light the engines when you can’t clearly see the rocket’s state.</small>'}
+        },
+        half:{
+          weather:{tag:'Over-cautious', t:'A bit of upper wind just needs a short HOLD to let it pass — no need to scrub the whole launch.<br><small>'+HALF_COST_EN+'</small>'},
+          recovery:{tag:'Over-cautious', t:'The recovery ship is only a little late — HOLD until it’s on station, no need to scrub.<br><small>'+HALF_COST_EN+'</small>'},
+          sea:{tag:'Over-cautious', t:'One fishing boat — just HOLD until it leaves the zone; scrubbing the launch is overkill.<br><small>'+HALF_COST_EN+'</small>'},
+          software:{tag:'Understandable', t:'Scrubbing on dropped telemetry is a safe, defensible call — not wrong. But a few seconds of HOLD to re-lock the signal would have been enough.<br><small>'+HALF_COST_EN+'</small>'}
+        },
+        boom:{
+          weather:{tag:'Boom', t:'You flew through out-of-limit wind. The rocket hit max-Q and the upper winds tore it apart.<small> Wind that blows through — and you paid for it with the whole rocket.</small><br><b>'+MEME+'</b>'},
+          recovery:{tag:'Boom', t:'You flew with no recovery ship on station. Coming back, the booster had nowhere to land and slammed into the sea.<small> You threw away the recovery before you even left the pad.</small><br><b>'+MEME+'</b>'},
+          sea:{tag:'Boom', t:'You launched with a boat in the exclusion zone. The rocket drifted out of the safety corridor near people, and range safety had to destroy it.<small> With a rocket overhead, nobody is allowed in the water. That’s the rule.</small><br><b>'+MEME+'</b>'},
+          software:{tag:'Boom', t:'Readings were already flickering and you flew anyway. An in-flight anomaly went unseen and the rocket lost control and broke up.<small> Don’t drive blind — a rocket even less so.</small><br><b>'+MEME+'</b>'},
+          engine:{tag:'Boom', t:'You flew a sick engine. Twenty seconds up, Engine 2 lost pressure and flamed out; the rocket lost balance and broke apart.<small> A bad engine never flies. That’s the iron rule.</small><br><b>'+MEME+'</b>'}
+        },
+        engineHold:{tag:'Too late', t:'A HOLD at T-15s won’t help — the pressure keeps falling, it won’t come back, and you end up scrubbing anyway, burning today’s window for nothing.<br><small>'+HALF_COST_EN+'</small>'},
+        engineCaught:{tag:'A great scrub', t:'At T-15s you called STOP — hard. Engine 2 really was faulty. <b>You just prevented a possible explosion.</b>'},
+        success:{tag:'Perfect launch 🚀', t:'The ground team swapped Engine 2 overnight. Two days later, fresh count, all six lights green… <b>T-10, 9, 8… Ignition… Liftoff!</b><br><small>You’re a real Launch Director — one who <b>knows when to call STOP</b>.</small>'}
+      },
+      callout:{ ignition:'IGNITION', liftoff:'LIFTOFF!' },
+      stampHalf:'SCRUBBED', stampSafe:'SAFE',
+      quiz:{
+        q:'At T-1 second the computer detected an engine anomaly and automatically aborted the launch. This launch should count as——',
+        choices:[
+          {text:'A failure, all for nothing ❌', correct:false},
+          {text:'A success — the safety system did its job and stopped a possible explosion ✅', correct:true}
+        ],
+        fbCorrect:'Right! An automatic abort isn’t failure — it’s <b>the safety system hitting the brakes for you</b>. It trades one “no launch” for one “possible explosion.” Real failure is flying when you should have stopped.',
+        fbWrong:'Think again: a sick engine flown anyway usually breaks up in the air. The computer calling stop at T-1s is exactly <b>the safety system succeeding</b> — it stopped a possible explosion. That’s a success, not a failure.'
+      },
+      badgeLocked:'Badge locked: be a proper Launch Director — hold when you should, stop when you must — to earn “Launch Director.”',
+      badgeEarned:'Badge earned: “Launch Director” — the best engineers dare to call STOP before T-0.'
+    }
+  };
+  let lang = 'zh';
+
+  // ---------------- DOM ----------------
+  const $ = (id)=>document.getElementById(id);
+  const canvas=$('c'), ctx=canvas.getContext('2d');
+  const clockEl=$('clock'), lightsEl=$('lights');
+  const eventCard=$('eventCard'), eventQ=$('eventQ');
+  const goBtn=$('goBtn'), holdBtn=$('holdBtn'), scrubBtn=$('scrubBtn');
+  const controls=$('controls'), startBtn=$('startBtn'), restartBtn=$('restartBtn');
+  const verdictEl=$('verdict'), badgeEl=$('badge'), badgeText=$('badgeText');
+  const quizPanel=$('quizPanel'), quizQ=$('quizQ'), quizChoices=$('quizChoices'), quizFb=$('quizFb');
+
+  // ---------------- scene state ----------------
+  const S = {
+    clock:180, clockCls:'',
+    rocketY:0, rocketVisible:true, flame:0, towerAlpha:1,
+    stamp:'', callout:'', flash:0, shake:0, ring:0, ringA:0,
+    particles:[],
+    verdictOn:false, verdictGet:null, verdictCls:''
+  };
+
+  let W=0,H=0,dpr=1, stars=[];
+  function resize(){
+    const rect=canvas.getBoundingClientRect();
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    W=rect.width; H=rect.height;
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    if(stars.length===0){
+      for(let i=0;i<120;i++) stars.push({x:Math.random(),y:Math.random()*0.8,r:Math.random()*1.2+0.2,a:Math.random()*0.6+0.2});
+    }
+  }
+
+  // ---------------- game flow ----------------
+  let phase='idle';           // idle|counting|event|resolving|launch|boom|scrub|done
+  let queue=[], idx=0, currentEvent=null;
+  let quizAnswered=null;
+
+  function buildQueue(){
+    const holdSys=['weather','recovery','sea','software'];
+    // Fisher-Yates light shuffle
+    for(let i=holdSys.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [holdSys[i],holdSys[j]]=[holdSys[j],holdSys[i]]; }
+    const holdTimes=[120,80,40,25];
+    const q=[{sys:'fuel',type:'nominal',time:150}];
+    holdSys.forEach((s,i)=>q.push({sys:s,type:'hold',time:holdTimes[i]}));
+    q.push({sys:'engine',type:'engine',time:15});
+    q.sort((a,b)=>b.time-a.time);
+    return q;
+  }
+
+  const lightState={ fuel:'ok', weather:'ok', sea:'ok', engine:'ok', software:'ok', recovery:'ok' };
+  const LIGHT_ORDER=['fuel','weather','sea','engine','software','recovery'];
+
+  function buildLights(){
+    lightsEl.innerHTML='';
+    LIGHT_ORDER.forEach(sys=>{
+      const el=document.createElement('span');
+      el.className='light '+cls(lightState[sys]);
+      el.dataset.sys=sys;
+      el.innerHTML='<span class="dot"></span><span class="lbl">'+T[lang].lights[sys]+'</span>';
+      lightsEl.appendChild(el);
+    });
+  }
+  function cls(st){ return st==='caution'?'caution':st==='fault'?'fault':''; }
+  function setLight(sys,st){ lightState[sys]=st; const el=lightsEl.querySelector('[data-sys="'+sys+'"]'); if(el) el.className='light '+cls(st); }
+  function renderLightLabels(){ LIGHT_ORDER.forEach(sys=>{ const el=lightsEl.querySelector('[data-sys="'+sys+'"] .lbl'); if(el) el.textContent=T[lang].lights[sys]; }); }
+
+  function resetGame(){
+    tweens.length=0;
+    phase='idle'; idx=0; currentEvent=null;
+    queue=buildQueue();
+    S.clock=180; S.clockCls=''; S.rocketY=0; S.rocketVisible=true; S.flame=0; S.towerAlpha=1;
+    S.stamp=''; S.callout=''; S.flash=0; S.shake=0; S.ring=0; S.ringA=0; S.particles.length=0;
+    Object.keys(lightState).forEach(k=>lightState[k]='ok');
+    buildLights();
+    hideVerdict();
+    eventCard.classList.add('hidden');
+    startBtn.classList.remove('hidden'); startBtn.disabled=false;
+    restartBtn.classList.add('hidden');
+    $('hint').classList.remove('hidden');
+  }
+
+  function startCountdown(){
+    if(phase!=='idle') return;
+    startBtn.disabled=true;
+    $('hint').classList.add('hidden');
+    phase='counting';
+    countTo(queue[0].time, ()=>showEvent(0));
+  }
+
+  function countTo(target, cb){
+    S.clockCls=''; setClockCls();
+    tween(v=>{S.clock=v;}, S.clock, target, 1600, easeInOut, cb);
+  }
+
+  function showEvent(i){
+    idx=i; const e=queue[i]; currentEvent=e;
+    S.clock=e.time; S.clockCls='hold'; setClockCls();
+    setLight(e.sys,'caution');
+    renderEventCard();
+    eventCard.classList.remove('hidden');
+    controls.classList.add('hidden');
+    phase='event';
+  }
+  function renderEventCard(){
+    if(!currentEvent) return;
+    const t=T[lang], e=currentEvent;
+    eventQ.innerHTML='<b>'+fmtClock(e.time)+' · '+t.lights[e.sys]+'</b><br>'+t.events[e.sys];
+    goBtn.textContent=t.go; holdBtn.textContent=t.hold; scrubBtn.textContent=t.scrub;
+  }
+
+  function decide(action){
+    if(phase!=='event') return;
+    const e=currentEvent;
+    eventCard.classList.add('hidden');
+    const R=()=>T[lang].results;
+    if(e.type==='nominal'){            // fuel — GO is correct
+      if(action==='go'){ setLight('fuel','ok'); resolveToast(t=>t.results.fuelGo,'ok',advance); }
+      else if(action==='hold'){ setLight('fuel','ok'); resolveToast(t=>t.results.fuelHold,'info',advance); }
+      else { setLight('fuel','fault'); endHalf(t=>t.results.fuelScrub); }
+    } else if(e.type==='hold'){        // HOLD is correct
+      if(action==='hold'){ setLight(e.sys,'ok'); resolveToast(t=>t.results.resolve[e.sys],'ok',advance); }
+      else if(action==='go'){ setLight(e.sys,'fault'); endBoom(t=>t.results.boom[e.sys]); }
+      else { setLight(e.sys,'fault'); endHalf(t=>t.results.half[e.sys]); }
+    } else {                            // engine — SCRUB is correct
+      if(action==='scrub'){ setLight('engine','ok'); endSuccess(); }
+      else if(action==='go'){ setLight('engine','fault'); endBoom(t=>t.results.boom.engine); }
+      else { setLight('engine','fault'); endHalf(t=>t.results.engineHold); }
+    }
+  }
+
+  function advance(){
+    idx++;
+    if(idx<queue.length){ phase='counting'; countTo(queue[idx].time, ()=>showEvent(idx)); }
+  }
+
+  function resolveToast(getter, cls, cb){
+    phase='resolving'; S.clockCls='go'; setClockCls();
+    showVerdict(getter, cls);
+    setTimeout(()=>{ hideVerdict(); cb(); }, 1700);
+  }
+
+  // ---------------- endings ----------------
+  function endBoom(getter){
+    phase='boom'; S.clockCls='bad'; setClockCls();
+    controls.classList.add('hidden');
+    playBoom(()=>{ showVerdict(getter,'bad'); finishRun(false); });
+  }
+  function endHalf(getter){
+    phase='scrub'; S.clockCls='hold'; setClockCls();
+    controls.classList.add('hidden');
+    playScrub('half', ()=>{ showVerdict(getter,'half'); finishRun('half'); });
+  }
+  function endSuccess(){
+    phase='scrub';
+    controls.classList.add('hidden');
+    S.clockCls='go'; setClockCls();
+    showVerdict(t=>t.results.engineCaught,'info');
+    playScrub('safe', ()=>{
+      setTimeout(()=>{
+        hideVerdict();
+        playLiftoff(()=>{
+          showVerdict(t=>t.results.success,'ok');
+          earnBadge();
+          finishRun(true);
+        });
+      }, 400);
+    });
+  }
+
+  function finishRun(kind){
+    phase='done';
+    quizPanel.classList.remove('hidden');
+    controls.classList.remove('hidden');
+    startBtn.classList.add('hidden');
+    restartBtn.classList.remove('hidden');
+  }
+
+  function earnBadge(){
+    try{ localStorage.setItem('mg.badge.launch-director','1'); }catch(e){}
+    renderBadge();
+  }
+  function isEarned(){ try{ return localStorage.getItem('mg.badge.launch-director')==='1'; }catch(e){ return false; } }
+  function renderBadge(){
+    const earned=isEarned();
+    badgeEl.className='badge'+(earned?' earned':'');
+    badgeText.textContent = earned ? T[lang].badgeEarned : T[lang].badgeLocked;
+  }
+
+  // ---------------- verdict ----------------
+  function showVerdict(getter,cls){ S.verdictOn=true; S.verdictGet=getter; S.verdictCls=cls; renderVerdict(); }
+  function hideVerdict(){ S.verdictOn=false; verdictEl.className='verdict'; }
+  function renderVerdict(){
+    if(!S.verdictOn){ verdictEl.className='verdict'; return; }
+    const v=S.verdictGet(T[lang]);
+    verdictEl.className='verdict show '+S.verdictCls;
+    verdictEl.innerHTML='<span class="tag">'+v.tag+'</span>'+v.t;
+  }
+
+  // ---------------- animations ----------------
+  function playScrub(kind, cb){
+    S.flame=0; S.rocketVisible=true;
+    S.stamp = kind==='safe' ? T[lang].stampSafe : T[lang].stampHalf;
+    S.stampKind = kind;
+    setTimeout(cb, 1100);
+  }
+
+  function playLiftoff(cb){
+    phase='launch'; S.stamp=''; S.rocketVisible=true; S.rocketY=0; S.flame=0; S.clockCls='';
+    let n=10;
+    (function step(){
+      if(n>=1){
+        S.callout='T-'+n; S.clock=n; S.clockCls=n<=3?'go':'';
+        if(n<=3) S.flame=Math.max(S.flame,0.18*(4-n));
+        n--; setTimeout(step, 380);
+      } else {
+        S.callout=T[lang].callout.ignition; S.clock=0; S.clockCls='go';
+        tween(v=>{S.flame=v;}, S.flame, 1, 650, easeOut, ()=>{
+          S.callout=T[lang].callout.liftoff;
+          tween(v=>{S.towerAlpha=v;}, 1, 0, 1400, easeInOut);
+          tween(v=>{S.rocketY=v;}, 0, H*1.15, 3400, easeIn, ()=>{ S.callout=''; cb(); });
+        });
+      }
+    })();
+  }
+
+  function playBoom(cb){
+    S.rocketVisible=true; S.rocketY=0; S.flame=0; S.callout='';
+    tween(v=>{S.flame=v;},0,1,450,easeOut,()=>{
+      S.callout=T[lang].callout.liftoff;
+      tween(v=>{S.rocketY=v;}, 0, H*0.26, 1700, easeOut, ()=>{
+        // engine-out abort
+        S.callout=''; S.flame=0; S.rocketVisible=false;
+        S.flash=1; S.shake=18; S.ring=0; S.ringA=1;
+        const {x,y}=rocketMid();
+        spawnParticles(x,y);
+        setTimeout(cb, 2200);
+      });
+    });
+  }
+
+  function rocketMid(){
+    const gy=H*0.86, rh=H*0.30, bottom=gy - S.rocketY;
+    return {x:W*0.52, y:bottom - rh*0.45};
+  }
+  function spawnParticles(x,y){
+    S.particles.length=0;
+    for(let i=0;i<52;i++){
+      const a=Math.random()*Math.PI*2, sp=Math.random()*4+1;
+      const roll=Math.random();
+      const col = roll<0.5 ? '#ffce7a' : roll<0.82 ? '#ff8c42' : (roll<0.93?'#ffffff':'#6b7280');
+      S.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-1.2,r:Math.random()*8+4,life:1,col});
+    }
+  }
+
+  // ---- tween engine ----
+  const tweens=[];
+  function tween(setter,from,to,dur,ease,onDone){ tweens.push({setter,from,to,dur,ease:ease||linear,start:performance.now(),onDone,done:false}); }
+  const linear=t=>t, easeIn=t=>t*t, easeOut=t=>1-(1-t)*(1-t), easeInOut=t=>t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+
+  function masterLoop(ts){
+    // tweens
+    for(let i=tweens.length-1;i>=0;i--){
+      const tw=tweens[i]; let p=(ts-tw.start)/tw.dur; if(p>=1)p=1;
+      tw.setter(tw.from+(tw.to-tw.from)*tw.ease(p));
+      if(p>=1){ tweens.splice(i,1); if(tw.onDone) tw.onDone(); }
+    }
+    // fx decay
+    if(S.flash>0) S.flash=Math.max(0,S.flash-0.05);
+    if(S.shake>0) S.shake*=0.90;
+    if(S.ringA>0){ S.ring+=W*0.012; S.ringA=Math.max(0,S.ringA-0.02); }
+    // particles
+    for(let i=S.particles.length-1;i>=0;i--){
+      const p=S.particles[i];
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.10; p.vx*=0.985; p.r*=1.006; p.life-=0.012;
+      if(p.life<=0) S.particles.splice(i,1);
+    }
+    clockEl.textContent=fmtClock(S.clock);
+    clockEl.className='clock '+(S.clockCls||'');
+    draw(ts);
+    requestAnimationFrame(masterLoop);
+  }
+  function setClockCls(){ clockEl.className='clock '+(S.clockCls||''); }
+
+  // ---------------- drawing ----------------
+  function draw(ts){
+    ctx.save();
+    ctx.clearRect(0,0,W,H);
+    if(S.shake>0.4){ ctx.translate((Math.random()-0.5)*S.shake,(Math.random()-0.5)*S.shake); }
+    drawSky(ts);
+    const gy=H*0.86;
+    drawGround(gy);
+    drawTower(gy);
+    drawPad(gy);
+    const rh=H*0.30, bottom=gy - S.rocketY, bx=W*0.52;
+    if(S.flame>0.01) drawFlame(bx,bottom,rh,ts);
+    if(S.rocketVisible) drawRocket(bx,bottom,rh);
+    if(S.stamp) drawStamp(bx, bottom-rh*0.5);
+    // particles
+    for(const p of S.particles){
+      ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=p.col;
+      ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+    // shock ring
+    if(S.ringA>0.02){
+      ctx.globalAlpha=S.ringA; ctx.strokeStyle='#ffd27f'; ctx.lineWidth=4;
+      const m=rocketMid(); ctx.beginPath(); ctx.arc(m.x,m.y,S.ring,0,7); ctx.stroke(); ctx.globalAlpha=1;
+    }
+    // white flash
+    if(S.flash>0.01){ ctx.globalAlpha=S.flash*0.8; ctx.fillStyle='#fff'; ctx.fillRect(-40,-40,W+80,H+80); ctx.globalAlpha=1; }
+    if(S.callout) drawCallout(S.callout);
+    ctx.restore();
+  }
+
+  function drawSky(ts){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#060a17'); g.addColorStop(0.7,'#0a0f1e'); g.addColorStop(1,'#05070f');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    for(const s of stars){ ctx.globalAlpha=s.a*(0.6+0.4*Math.sin(ts*0.002+s.x*30)); ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.r,0,7); ctx.fill(); }
+    ctx.globalAlpha=1;
+  }
+  function drawGround(gy){
+    ctx.fillStyle='#0e1420'; ctx.fillRect(0,gy,W,H-gy);
+    ctx.strokeStyle='#1d2740'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke();
+  }
+  function drawPad(gy){
+    const bx=W*0.52, pw=W*0.16;
+    ctx.fillStyle='#2a3245'; ctx.fillRect(bx-pw/2, gy, pw, H*0.03);
+    ctx.fillStyle='#3a465f'; ctx.fillRect(bx-pw*0.62, gy+H*0.03, pw*1.24, H*0.02);
+  }
+  function drawTower(gy){
+    if(S.towerAlpha<=0.01) return;
+    ctx.save(); ctx.globalAlpha=S.towerAlpha;
+    const bx=W*0.52, rw=H*0.30*0.16;
+    const tx=bx - rw*1.9, top=gy-H*0.34, bot=gy;
+    ctx.strokeStyle='#4a566e'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(tx,bot); ctx.lineTo(tx,top);
+    ctx.moveTo(tx-10,bot); ctx.lineTo(tx-10,top+8); ctx.stroke();
+    ctx.lineWidth=1.5;
+    for(let y=bot;y>top;y-=16){ ctx.beginPath(); ctx.moveTo(tx-10,y); ctx.lineTo(tx,y-8); ctx.moveTo(tx,y); ctx.lineTo(tx-10,y-8); ctx.stroke(); }
+    // arms toward rocket
+    ctx.strokeStyle='#4a566e'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(tx, gy-H*0.14); ctx.lineTo(bx-rw*0.9, gy-H*0.14); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawRocket(bx,bottom,h){
+    const w=h*0.16;
+    const bodyTop=bottom-h*0.66, noseTop=bottom-h;
+    // fins
+    ctx.fillStyle='#20262f';
+    ctx.beginPath(); ctx.moveTo(bx-w/2,bottom); ctx.lineTo(bx-w*0.92,bottom); ctx.lineTo(bx-w/2,bottom-h*0.14); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(bx+w/2,bottom); ctx.lineTo(bx+w*0.92,bottom); ctx.lineTo(bx+w/2,bottom-h*0.14); ctx.closePath(); ctx.fill();
+    // body
+    const bg=ctx.createLinearGradient(bx-w/2,0,bx+w/2,0);
+    bg.addColorStop(0,'#9aa3ae'); bg.addColorStop(0.4,'#eef2f6'); bg.addColorStop(1,'#b7bec8');
+    ctx.fillStyle=bg;
+    roundRect(bx-w/2,bodyTop,w,bottom-bodyTop,4); ctx.fill();
+    // nose cone
+    ctx.fillStyle='#cfd6de';
+    ctx.beginPath(); ctx.moveTo(bx-w/2,bodyTop); ctx.quadraticCurveTo(bx,noseTop, bx+w/2,bodyTop); ctx.closePath(); ctx.fill();
+    // black band
+    ctx.fillStyle='#171b22'; ctx.fillRect(bx-w/2, bottom-h*0.22, w, h*0.05);
+    // window
+    ctx.fillStyle='#4aa3ff'; ctx.beginPath(); ctx.arc(bx, bodyTop+h*0.12, w*0.18,0,7); ctx.fill();
+    ctx.strokeStyle='#0d1220'; ctx.lineWidth=1.5; ctx.stroke();
+    // engine bell
+    ctx.fillStyle='#3a424f'; ctx.fillRect(bx-w*0.28, bottom, w*0.56, h*0.03);
+  }
+
+  function drawFlame(bx,bottom,h,ts){
+    const f=S.flame, fl=Math.sin(ts*0.03)*0.12+1;
+    const len=h*0.55*f*fl, w=h*0.16;
+    const y0=bottom+h*0.02;
+    let g=ctx.createLinearGradient(0,y0,0,y0+len);
+    g.addColorStop(0,'rgba(255,255,255,0.95)'); g.addColorStop(0.35,'#ffd27f'); g.addColorStop(0.7,'#ff8c42'); g.addColorStop(1,'rgba(255,90,26,0)');
+    ctx.fillStyle=g;
+    ctx.beginPath(); ctx.moveTo(bx-w*0.42,y0); ctx.quadraticCurveTo(bx-w*0.2,y0+len*0.5, bx,y0+len);
+    ctx.quadraticCurveTo(bx+w*0.2,y0+len*0.5, bx+w*0.42,y0); ctx.closePath(); ctx.fill();
+    // inner core
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.moveTo(bx-w*0.16,y0); ctx.quadraticCurveTo(bx,y0+len*0.35, bx,y0+len*0.55);
+    ctx.quadraticCurveTo(bx,y0+len*0.35, bx+w*0.16,y0); ctx.closePath(); ctx.fill();
+    // smoke on pad
+    if(S.rocketY < H*0.02){
+      ctx.fillStyle='rgba(200,205,215,0.18)';
+      for(let i=0;i<4;i++){ ctx.beginPath(); ctx.arc(bx+(i-1.5)*w*0.6, bottom+h*0.03, h*0.06*fl,0,7); ctx.fill(); }
+    }
+  }
+
+  function drawStamp(bx,cy){
+    const t=T[lang]; const safe=S.stampKind==='safe';
+    ctx.save(); ctx.translate(bx,cy); ctx.rotate(-0.18);
+    ctx.strokeStyle=safe?'#57d38c':'#ffcf5a'; ctx.lineWidth=3;
+    ctx.font='700 '+Math.round(H*0.05)+'px -apple-system,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    const txt=S.stamp; const tw=ctx.measureText(txt).width;
+    roundRectStroke(-tw/2-14,-H*0.04,tw+28,H*0.08,8);
+    ctx.fillStyle=safe?'#57d38c':'#ffcf5a'; ctx.fillText(txt,0,2);
+    ctx.restore();
+  }
+  function drawCallout(txt){
+    ctx.save();
+    ctx.font='800 '+Math.round(H*0.11)+'px -apple-system,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor='#ff8c42'; ctx.shadowBlur=24;
+    ctx.fillStyle='#ffd27f'; ctx.fillText(txt, W/2, H*0.24);
+    ctx.restore();
+  }
+
+  function roundRect(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function roundRectStroke(x,y,w,h,r){ roundRect(x,y,w,h,r); ctx.stroke(); }
+
+  // ---------------- helpers ----------------
+  function fmtClock(sec){
+    sec=Math.max(0,Math.round(sec));
+    const m=Math.floor(sec/60), s=sec%60;
+    return 'T-'+(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  }
+
+  // ---------------- quiz ----------------
+  function buildQuiz(){
+    const t=T[lang];
+    quizQ.textContent=t.quiz.q;
+    quizChoices.innerHTML='';
+    t.quiz.choices.forEach((c,i)=>{
+      const b=document.createElement('button');
+      b.className='choice'; b.dataset.i=i;
+      b.innerHTML='<span class="key">'+'AB'[i]+'</span><span>'+c.text+'</span>';
+      b.addEventListener('click',()=>answerQuiz(i));
+      quizChoices.appendChild(b);
+    });
+    if(quizAnswered!=null) applyQuiz();
+    else quizFb.textContent='';
+  }
+  function answerQuiz(i){ quizAnswered=i; applyQuiz(); }
+  function applyQuiz(){
+    const t=T[lang];
+    [...quizChoices.children].forEach(ch=>{
+      const i=+ch.dataset.i; ch.className='choice';
+      if(i===quizAnswered){ ch.classList.add(t.quiz.choices[i].correct?'correct':'wrong'); }
+      else ch.classList.add('dim');
+    });
+    quizFb.innerHTML = t.quiz.choices[quizAnswered].correct ? t.quiz.fbCorrect : t.quiz.fbWrong;
+  }
+
+  // ---------------- static render + lang ----------------
+  function renderStatic(){
+    const t=T[lang];
+    $('title').textContent=t.title;
+    $('titleEn').textContent=t.titleEn;
+    $('langBtn').textContent=t.lang;
+    $('back').textContent=t.back;
+    $('hook').innerHTML=t.hook;
+    $('clockLabel').textContent=t.clockLabel;
+    $('hint').innerHTML=t.hint;
+    startBtn.textContent=t.start;
+    restartBtn.textContent=t.restart;
+    goBtn.textContent=t.go; holdBtn.textContent=t.hold; scrubBtn.textContent=t.scrub;
+    renderLightLabels();
+    if(currentEvent && phase==='event') renderEventCard();
+    if(S.verdictOn) renderVerdict();
+    buildQuiz();
+    renderBadge();
+    document.documentElement.lang=lang;
+  }
+
+  // ---------------- events ----------------
+  goBtn.addEventListener('click',()=>decide('go'));
+  holdBtn.addEventListener('click',()=>decide('hold'));
+  scrubBtn.addEventListener('click',()=>decide('scrub'));
+  startBtn.addEventListener('click',startCountdown);
+  restartBtn.addEventListener('click',()=>{ resetGame(); });
+  $('langBtn').addEventListener('click',()=>{ lang=lang==='zh'?'en':'zh'; renderStatic(); });
+  window.addEventListener('resize', resize);
+
+  // ---------------- init ----------------
+  resize();
+  resetGame();
+  renderStatic();
+  requestAnimationFrame(masterLoop);
+})();
+</script>
+</body>
+</html>

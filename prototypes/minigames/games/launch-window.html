@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>发射窗口 · Launch Window</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  /* game-specific only: canvas cursor + readout accent states */
+  .stage{cursor:crosshair}
+  .readout .big.win{color:var(--ok)}
+  .chip.win{color:#fff;background:linear-gradient(90deg,#2f9e63,var(--ok))}
+  .closing{margin-top:10px;font-size:13px;line-height:1.5;color:var(--flame2);
+           border-left:3px solid var(--flame);padding:6px 0 6px 12px;background:rgba(255,140,66,.06);
+           border-radius:0 8px 8px 0;display:none}
+  .closing.show{display:block}
+</style>
+</head>
+<body>
+  <header>
+    <div class="htitle"><h1 id="title">发射窗口</h1><span class="en" id="titleEn">Launch Window</span></div>
+    <div class="headright">
+      <a class="backlink" href="../index.html" id="back">← 目录</a>
+      <span class="langtoggle" id="langBtn">EN</span>
+    </div>
+  </header>
+
+  <p class="hook" id="hook"></p>
+
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="readout">
+      <span class="muted" id="phaseLabel" style="font-size:13px"></span>
+      <span class="big" id="phase">0</span><span class="unit">°</span>
+      <span class="chip" id="chip"></span>
+    </div>
+    <div class="analogy" id="analogy"></div>
+
+    <div class="buttons">
+      <button class="fire" id="fireBtn">发射 🚀</button>
+      <button class="ghost" id="ffBtn">快进 ⏩</button>
+    </div>
+
+    <div class="feedback" id="feedback"></div>
+    <div class="closing" id="closing"></div>
+  </div>
+
+  <div class="badge" id="badge">
+    <span class="medal">🏅</span>
+    <span id="badgeText"></span>
+  </div>
+
+<script>
+(() => {
+  // ================= real-ish orbital constants =================
+  // Circular orbits, counter-clockwise. Time unit = Earth-day.
+  const P_EARTH = 365;                       // days
+  const P_MARS  = 687;                        // days
+  const wE = 360 / P_EARTH;                   // deg/day  (~0.986)
+  const wM = 360 / P_MARS;                    // deg/day  (~0.524)
+  const R_E = 1.00;                           // AU (Earth orbit radius)
+  const R_M = 1.52;                           // AU (Mars orbit radius)
+  const A_T = (R_E + R_M) / 2;                // transfer semi-major axis
+  const E_T = (R_M - R_E) / (R_M + R_E);      // transfer eccentricity (~0.206)
+  const T_TRANSFER = 259;                     // days, Earth->Mars Hohmann half-orbit
+  const TOL = 8;                              // deg tolerance on the meeting
+  // Departure phase that works falls out of the geometry: 180 - wM*259 ≈ 44.3°
+  const IDEAL_PHASE = 180 - wM * T_TRANSFER;
+
+  // sim clock
+  const DAYS_PER_SEC = 26;                    // normal watch speed
+  let speedMult = 1;                          // fast-forward toggle (x3)
+
+  // ================= i18n =================
+  const T = {
+    zh: {
+      title:'发射窗口', titleEn:'Launch Window', lang:'EN', back:'← 目录',
+      hook:'马斯克：地球和火星要站在合适的相对位置（约 <b>44°</b>）才能发射。每 <b>26 个月</b>（两年多）才有一次机会。过时不候——你得算准时机再点火。',
+      phaseLabel:'火星领先地球', launch:'发射 🚀', retry:'再来一次', flying:'飞行中…',
+      ff:'快进 ⏩', ffOn:'快进 ⏩ ×3',
+      analogy:'会合窗口每 <b>26 个月</b> ≈ 两年多一次；霍曼转移 <b>259 天</b> ≈ 大半年的漂流。',
+      chipWin:'窗口打开',
+      hintReveal:'发现了吗？让火星走进这块 <b>44° 扇形</b>再点火，飞船飞到终点时火星正好赶到。',
+      closing:'马斯克：聪明的工程师不跟宇宙较劲，而是<b>借宇宙的力</b>。<span class="muted">Smart engineers don\'t fight the universe — they borrow its motion.</span>',
+      now:'现在！',
+      badgeLocked:'徽章未解锁：算准一次发射窗口，即可获得「星际调度员」。',
+      badgeEarned:'已获得徽章「星际调度员」——你借上了宇宙的力，一击命中火星。',
+      meme:'炸了？又一份数据。',
+      v:{
+        ok:{tag:'会合成功 🎉', t:'完美！飞船在霍曼转移的终点<b>正好撞上火星</b>！<small>出发时夹角 {phase}°，漂流 259 天（大半年）后精准会合。你是真正的星际调度员。</small>'},
+        early:{tag:'扑空了', t:'太早了！火星还没赶到会合点，飞船只能<b>孤独绕太阳</b>……两年后见。<small>出发夹角 {phase}° 偏小，火星落在了后面。</small>'},
+        late:{tag:'扑空了', t:'太晚了！火星已经<b>冲过了会合点</b>，飞船扑了个空，孤独绕太阳……两年后见。<small>出发夹角 {phase}° 偏大，火星跑到前面去了。</small>'}
+      }
+    },
+    en: {
+      title:'Launch Window', titleEn:'发射窗口', lang:'中', back:'← Menu',
+      hook:"Musk: Earth and Mars must line up just right (about <b>44°</b>) to launch. The window opens only once every <b>26 months</b> (a bit over two years). Miss it and it's gone — time your ignition.",
+      phaseLabel:'Mars lead over Earth', launch:'LAUNCH 🚀', retry:'Try again', flying:'Coasting…',
+      ff:'Fast-fwd ⏩', ffOn:'Fast-fwd ⏩ ×3',
+      analogy:'The window comes every <b>26 months</b> ≈ once every 2+ years; the Hohmann coast is <b>259 days</b> ≈ most of a year adrift.',
+      chipWin:'window open',
+      hintReveal:'See it? Let Mars drift into this <b>44° wedge</b> before ignition — then the craft and Mars reach the meeting point together.',
+      closing:'Musk: Smart engineers don\'t fight the universe — they <b>borrow its motion</b>.<span class="muted">聪明的工程师不跟宇宙较劲，而是借宇宙的力。</span>',
+      now:'NOW!',
+      badgeLocked:'Badge locked: nail one launch window to earn "Interplanetary Dispatcher".',
+      badgeEarned:'Badge earned: "Interplanetary Dispatcher" — you borrowed the universe\'s motion and hit Mars.',
+      meme:'Boom? Another data point.',
+      v:{
+        ok:{tag:'Rendezvous 🎉', t:'Perfect! At the end of the Hohmann transfer the craft <b>meets Mars exactly</b>!<small>Departure angle {phase}°, a 259-day (most-of-a-year) coast to a precise rendezvous. A true dispatcher.</small>'},
+        early:{tag:'Whiff', t:"Too early! Mars hasn't reached the meeting point — the craft just <b>loops the Sun alone</b>… see you in two years.<small>Departure angle {phase}° too small; Mars trailed behind.</small>"},
+        late:{tag:'Whiff', t:'Too late! Mars already <b>blew past the meeting point</b> — the craft whiffs and loops the Sun alone… see you in two years.<small>Departure angle {phase}° too big; Mars ran out ahead.</small>'}
+      }
+    }
+  };
+  let lang = 'zh';
+
+  // ================= DOM =================
+  const canvas   = document.getElementById('c');
+  const ctx      = canvas.getContext('2d');
+  const phaseEl  = document.getElementById('phase');
+  const chipEl   = document.getElementById('chip');
+  const analogyEl= document.getElementById('analogy');
+  const fireBtn  = document.getElementById('fireBtn');
+  const ffBtn    = document.getElementById('ffBtn');
+  const verdictEl= document.getElementById('verdict');
+  const badgeEl  = document.getElementById('badge');
+  const badgeText= document.getElementById('badgeText');
+  const feedbackEl=document.getElementById('feedback');
+  const closingEl= document.getElementById('closing');
+
+  // ================= persistence =================
+  const KEY = 'launchWindow.v1';
+  const store = load();
+  function load(){ try{ return JSON.parse(localStorage.getItem(KEY)) || {}; }catch(e){ return {}; } }
+  function save(){ try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){} }
+
+  // ================= canvas sizing (DPR-aware, from newton-cannon) =================
+  let W=0,H=0,cx=0,cy=0,scale=1,dpr=1;
+  const stars=[];
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = W*dpr; canvas.height = H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    cx = W/2; cy = H/2;
+    const marsOrbitPx = Math.min(W,H) * 0.40;
+    scale = marsOrbitPx / R_M;               // px per AU
+    if(stars.length===0){
+      for(let i=0;i<170;i++) stars.push({x:Math.random(),y:Math.random(),r:Math.random()*1.2+0.2,a:Math.random()*0.6+0.2});
+    }
+    draw();
+  }
+  // polar (AU, deg CCW) -> screen px
+  function px(r,deg){ const a=deg*Math.PI/180; return [cx + r*scale*Math.cos(a), cy - r*scale*Math.sin(a)]; }
+
+  // ================= math helpers =================
+  const norm360 = d => ((d%360)+360)%360;
+  function signedDiff(a,b){ let d=norm360(a-b); if(d>180) d-=360; return d; } // a-b in (-180,180]
+
+  // Kepler: true anomaly at fraction f (0..1) of the transfer (perihelion->aphelion).
+  // Mean anomaly sweeps 0..π over the half orbit; solve E - e sinE = M by Newton.
+  function trueAnomalyAt(f){
+    const M = Math.PI * f;
+    let E = M;
+    for(let i=0;i<10;i++){ E = E - (E - E_T*Math.sin(E) - M) / (1 - E_T*Math.cos(E)); }
+    return 2*Math.atan2(Math.sqrt(1+E_T)*Math.sin(E/2), Math.sqrt(1-E_T)*Math.cos(E/2)); // 0..π
+  }
+  function transferR(nu){ return A_T*(1-E_T*E_T)/(1+E_T*Math.cos(nu)); }
+
+  // ================= state =================
+  // mode: 'orbit' (waiting) | 'transfer' (coasting) | 'result'
+  let mode='orbit';
+  let t=0;                       // sim days since scene start
+  let thetaE0=0, thetaM0=120;    // starting angles (deg): Mars leads by 120° -> first window in a few sec
+  let tTransfer=0;               // days into current transfer
+  let launch=null;               // {thetaE0, thetaM0, arrivalCraft, arrivalMars, miss}
+  let craftTrail=[];             // [ [r,deg], ... ] traveled arc
+  let fails=0, helper=false;
+  let lastTs=0;
+
+  function earthAngle(){ return norm360(thetaE0 + wE*t); }
+  function marsAngle(){  return norm360(thetaM0 + wM*t); }
+  function phaseAngle(){ return norm360(marsAngle() - earthAngle()); } // Mars lead over Earth 0..360
+
+  // ================= launch / propagation =================
+  function doLaunch(){
+    const eA = earthAngle(), mA = marsAngle();
+    // Propagate honestly: craft rides the transfer ellipse from Earth's position (perihelion)
+    // to aphelion 180° away over T_TRANSFER days; meanwhile Mars keeps orbiting.
+    const arrivalCraft = norm360(eA + 180);
+    const arrivalMars  = norm360(mA + wM*T_TRANSFER);
+    const miss = signedDiff(arrivalMars, arrivalCraft);   // = departurePhase - IDEAL_PHASE
+    launch = { thetaE0:eA, thetaM0:mA, phase:phaseAngle(), arrivalCraft, arrivalMars, miss };
+    craftTrail = [];
+    tTransfer = 0;
+    mode='transfer';
+    hideVerdict();
+    updateButtons();
+  }
+
+  function finishTransfer(){
+    mode='result';
+    const a = Math.abs(launch.miss);
+    let kind = a<=TOL ? 'ok' : (launch.miss>0 ? 'late' : 'early');
+    if(kind==='ok'){
+      store.won = true; save();
+      try{ localStorage.setItem('mg.badge.launch-window','1'); }catch(e){}
+    } else {
+      fails++;
+      if(fails>=2 && !helper){ helper=true; feedbackEl.innerHTML = T[lang].hintReveal; }
+    }
+    showVerdict(kind);
+    updateButtons();
+    renderBadge();
+  }
+
+  function reset(){
+    mode='orbit'; launch=null; craftTrail=[]; tTransfer=0;
+    hideVerdict();
+    closingEl.classList.remove('show');
+    updateButtons();
+  }
+
+  // ================= drawing =================
+  function drawSun(){
+    const [x,y]=[cx,cy];
+    const g=ctx.createRadialGradient(x,y,2,x,y,26);
+    g.addColorStop(0,'#fff6d8'); g.addColorStop(.4,'#ffd166'); g.addColorStop(1,'rgba(255,140,66,0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,y,26,0,7); ctx.fill();
+    ctx.fillStyle='#ffe08a'; ctx.beginPath(); ctx.arc(x,y,8,0,7); ctx.fill();
+  }
+  function drawOrbit(r,color){
+    ctx.strokeStyle=color; ctx.lineWidth=1; ctx.setLineDash([2,5]);
+    ctx.beginPath(); ctx.arc(cx,cy,r*scale,0,7); ctx.stroke(); ctx.setLineDash([]);
+  }
+  function drawPlanet(r,deg,rad,body){
+    const [x,y]=px(r,deg);
+    if(body==='earth'){
+      const g=ctx.createRadialGradient(x-rad*0.3,y-rad*0.3,1,x,y,rad);
+      g.addColorStop(0,'#7fb8f2'); g.addColorStop(.6,'#3a7bd0'); g.addColorStop(1,'#123a6b');
+      ctx.fillStyle=g;
+    } else {
+      const g=ctx.createRadialGradient(x-rad*0.3,y-rad*0.3,1,x,y,rad);
+      g.addColorStop(0,'#ffb27a'); g.addColorStop(.6,'#e0623a'); g.addColorStop(1,'#7a2a18');
+      ctx.fillStyle=g;
+    }
+    ctx.beginPath(); ctx.arc(x,y,rad,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=1; ctx.stroke();
+    return [x,y];
+  }
+  function drawWedge(){
+    // ideal 44° departure wedge, anchored to Earth's CURRENT direction.
+    const eA = earthAngle();
+    const targetDir = norm360(eA + IDEAL_PHASE);           // where Mars should sit at ignition
+    const lo = targetDir - TOL, hi = targetDir + TOL;
+    const rOut = R_M*scale*1.06;
+    // shaded window band
+    ctx.fillStyle='rgba(87,211,140,.14)';
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,rOut,-hi*Math.PI/180,-lo*Math.PI/180);   // canvas y-flip -> negate
+    ctx.closePath(); ctx.fill();
+    // center target line
+    const [tx,ty]=px(R_M*1.08,targetDir);
+    ctx.strokeStyle='rgba(87,211,140,.7)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(tx,ty); ctx.stroke(); ctx.setLineDash([]);
+    // Earth reference spoke
+    const [ex,ey]=px(R_M*1.08,eA);
+    ctx.strokeStyle='rgba(120,180,255,.5)'; ctx.setLineDash([2,4]);
+    ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(ex,ey); ctx.stroke(); ctx.setLineDash([]);
+    // 44° label at mid
+    const [lx,ly]=px(R_M*0.55, norm360(eA+IDEAL_PHASE/2));
+    ctx.fillStyle='rgba(87,211,140,.9)'; ctx.font='bold 12px -apple-system,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('44°', lx, ly);
+    // "NOW!" when Mars is inside the window
+    if(Math.abs(signedDiff(marsAngle(), targetDir))<=TOL){
+      const [nx,ny]=px(R_M*1.24, targetDir);
+      ctx.fillStyle='#57d38c'; ctx.font='bold 13px -apple-system,sans-serif';
+      ctx.fillText(T[lang].now, nx, ny);
+    }
+  }
+  function drawTransferEllipse(dashedFull){
+    if(!launch) return;
+    ctx.lineJoin='round';
+    if(dashedFull){
+      // the lonely full loop around the Sun (Kepler ellipse, nu 0..2π)
+      ctx.strokeStyle='rgba(160,170,200,.35)'; ctx.lineWidth=1.2; ctx.setLineDash([4,5]);
+      ctx.beginPath();
+      for(let d=0; d<=360; d+=3){
+        const nu=d*Math.PI/180; const r=transferR(nu); const deg=launch.thetaE0 + d;
+        const [x,y]=px(r,deg); (d===0?ctx.moveTo:ctx.lineTo).call(ctx,x,y);
+      }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    // traveled arc (bright)
+    if(craftTrail.length>1){
+      ctx.strokeStyle='#ff8c42'; ctx.lineWidth=2.4; ctx.beginPath();
+      const [x0,y0]=px(craftTrail[0][0],craftTrail[0][1]); ctx.moveTo(x0,y0);
+      for(let i=1;i<craftTrail.length;i++){ const [x,y]=px(craftTrail[i][0],craftTrail[i][1]); ctx.lineTo(x,y); }
+      ctx.stroke();
+    }
+  }
+  function drawCraft(){
+    if(craftTrail.length===0) return;
+    const p=craftTrail[craftTrail.length-1];
+    const [x,y]=px(p[0],p[1]);
+    ctx.save(); ctx.shadowColor='#ff8c42'; ctx.shadowBlur=12;
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,4,0,7); ctx.fill(); ctx.restore();
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for(const s of stars){ ctx.globalAlpha=s.a; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(s.x*W,s.y*H,s.r,0,7); ctx.fill(); }
+    ctx.globalAlpha=1;
+    drawOrbit(R_E,'rgba(120,180,255,.5)');
+    drawOrbit(R_M,'rgba(255,140,90,.5)');
+    if(helper && mode==='orbit') drawWedge();
+    drawSun();
+    if(mode==='transfer' || mode==='result'){ drawTransferEllipse(mode==='result'); drawCraft(); }
+    drawPlanet(R_E, earthAngle(), 7, 'earth');
+    drawPlanet(R_M, marsAngle(), 6, 'mars');
+  }
+
+  // ================= main loop =================
+  function frame(ts){
+    if(!lastTs) lastTs=ts;
+    let dtSec = Math.min((ts-lastTs)/1000, 0.05); lastTs=ts;
+    const dDays = dtSec * DAYS_PER_SEC * speedMult;
+
+    if(mode==='orbit'){
+      t += dDays;
+    } else if(mode==='transfer'){
+      t += dDays;                       // planets keep orbiting
+      tTransfer += dDays;
+      const f = Math.min(tTransfer / T_TRANSFER, 1);
+      const nu = trueAnomalyAt(f);
+      const r  = transferR(nu);
+      const deg= launch.thetaE0 + nu*180/Math.PI;
+      craftTrail.push([r, deg]);
+      if(tTransfer >= T_TRANSFER) finishTransfer();
+    }
+    // (result mode: frozen)
+
+    renderReadout();
+    draw();
+    requestAnimationFrame(frame);
+  }
+
+  // ================= readout / verdict =================
+  function renderReadout(){
+    const p = mode==='orbit' ? phaseAngle() : (launch ? launch.phase : phaseAngle());
+    phaseEl.textContent = Math.round(p);
+    // chip lights only after discovery (helper), keeping the rule undiscovered up front
+    const inWin = helper && mode==='orbit' && Math.abs(signedDiff(p, IDEAL_PHASE))<=TOL;
+    phaseEl.className = 'big' + (inWin?' win':'');
+    if(inWin){ chipEl.textContent=T[lang].chipWin; chipEl.className='chip win'; chipEl.style.display=''; }
+    else { chipEl.style.display='none'; }
+  }
+  function showVerdict(kind){
+    const v=T[lang].v[kind];
+    const cls = kind==='ok' ? 'ok' : 'bad';
+    let html = `<span class="tag">${v.tag}</span>${v.t.replace('{phase}', Math.round(launch.phase))}`;
+    if(kind!=='ok') html += ` <b>${T[lang].meme}</b>`;
+    verdictEl.className='verdict show '+cls;
+    verdictEl.innerHTML=html;
+    if(kind==='ok'){ closingEl.innerHTML=T[lang].closing; closingEl.classList.add('show'); }
+  }
+  function hideVerdict(){ verdictEl.className='verdict'; }
+
+  function updateButtons(){
+    if(mode==='orbit'){ fireBtn.textContent=T[lang].launch; fireBtn.disabled=false; }
+    else if(mode==='transfer'){ fireBtn.textContent=T[lang].flying; fireBtn.disabled=true; }
+    else { fireBtn.textContent=T[lang].retry; fireBtn.disabled=false; }
+    ffBtn.textContent = speedMult>1 ? T[lang].ffOn : T[lang].ff;
+    ffBtn.classList.toggle('fire', speedMult>1);
+  }
+
+  function renderBadge(){
+    const earned=!!store.won;
+    badgeEl.className='badge'+(earned?' earned':'');
+    badgeText.textContent = earned ? T[lang].badgeEarned : T[lang].badgeLocked;
+  }
+
+  // ================= static text =================
+  function renderStatic(){
+    const s=T[lang];
+    document.getElementById('title').textContent=s.title;
+    document.getElementById('titleEn').textContent=s.titleEn;
+    document.getElementById('langBtn').textContent=s.lang;
+    document.getElementById('back').textContent=s.back;
+    document.getElementById('hook').innerHTML=s.hook;
+    document.getElementById('phaseLabel').textContent=s.phaseLabel;
+    analogyEl.innerHTML=s.analogy;
+    if(helper) feedbackEl.innerHTML=s.hintReveal; else feedbackEl.innerHTML='';
+    if(closingEl.classList.contains('show')) closingEl.innerHTML=s.closing;
+    if(mode==='result' && launch){
+      const a=Math.abs(launch.miss);
+      showVerdict(a<=TOL?'ok':(launch.miss>0?'late':'early'));
+    }
+    updateButtons();
+    document.documentElement.lang=lang;
+  }
+
+  // ================= events =================
+  fireBtn.addEventListener('click', ()=>{
+    if(mode==='orbit') doLaunch();
+    else if(mode==='result') reset();
+  });
+  ffBtn.addEventListener('click', ()=>{ speedMult = speedMult>1 ? 1 : 3; updateButtons(); });
+  document.getElementById('langBtn').addEventListener('click', ()=>{
+    lang = lang==='zh'?'en':'zh';
+    renderStatic(); renderReadout(); renderBadge();
+  });
+  window.addEventListener('resize', resize);
+
+  // ================= init =================
+  renderStatic();
+  renderReadout();
+  renderBadge();
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>传球训练 · Lead the Target</title>
+<link rel="stylesheet" href="../common.css">
+<style>
+  /* game-specific only: emoji rendering + a couple tweaks common.css doesn't cover */
+  canvas{touch-action:none}
+  .hintline{margin-top:12px; font-size:13px; line-height:1.5; color:var(--muted); min-height:18px}
+  .hintline.on{color:var(--flame2)}
+  .hintline b{color:var(--flame2)}
+  .dirword{color:var(--ink); font-weight:600}
+</style>
+</head>
+<body>
+  <header>
+    <div class="htitle"><h1 id="title">传球训练</h1><span class="en" id="titleEn">Lead the Target</span></div>
+    <div class="headright">
+      <a class="backlink" href="../index.html" id="back">← 目录</a>
+      <span class="langtoggle" id="langBtn">EN</span>
+    </div>
+  </header>
+
+  <p class="hook" id="hook"></p>
+
+  <div class="stage">
+    <canvas id="c"></canvas>
+    <div class="verdict" id="verdict"></div>
+  </div>
+
+  <div class="panel">
+    <div class="readout">
+      <span class="big" id="aimBig">0</span><span class="unit">°</span>
+      <span class="chip" id="leadChip"></span>
+    </div>
+    <div class="analogy" id="analogy"></div>
+
+    <div class="sliderwrap">
+      <input type="range" id="slider" min="-80" max="80" step="1" value="0" />
+      <div class="ticks" id="ticks"></div>
+    </div>
+
+    <div class="buttons">
+      <button class="fire" id="throwBtn">传球！</button>
+      <button class="ghost" id="newBtn">换一个队友</button>
+    </div>
+
+    <div class="hintline" id="hint"></div>
+  </div>
+
+  <div class="badge" id="badge">
+    <span class="medal">🏅</span>
+    <span id="badgeText"></span>
+  </div>
+
+<script>
+(() => {
+  // ============================================================
+  //  i18n
+  // ============================================================
+  const T = {
+    zh: {
+      title:'传球训练', titleEn:'Lead the Target', lang:'EN',
+      back:'← 目录',
+      hook:'马斯克：你<b>不能</b>朝火星现在的位置飞——等你到了，它早跑没影了。要像<b>传球给奔跑的队友</b>：朝它"将要在"的位置扔。先在这块场地上，把球传到队友手里。',
+      throwBtn:'传球！', newBtn:'换一个队友',
+      aimBig:'瞄准角度',
+      analogy:(dir)=>`队友正<span class="dirword">向${dir}</span>跑。球速固定——想想球飞过去的这几秒，他会跑多远，再决定往哪扔。`,
+      dirRight:'右', dirLeft:'左',
+      chipNow:'对准他现在', chipLead:(n)=>`提前 ${n}°`, chipBehind:(n)=>`偏后 ${n}°`,
+      tickNow:'他现在', tickLead:'提前量',
+      hintStart:'滑动瞄准，然后按「传球」。看看球飞到时他还在不在那儿。',
+      hintHelp:'马斯克：别瞄他<b>现在</b>的位置——瞄他<b>要跑到</b>的地方。（虚线圈就是提前量）',
+      badgeLocked:'徽章未解锁：成功把球传到队友手里，即可获得「提前量直觉」。',
+      badgeEarned:'已获得徽章「提前量直觉」——瞄准的是"将要在"，不是"现在在"。',
+      v:{
+        caught:{tag:'接住了 🎉', t:'漂亮！你朝他<b>将要到</b>的位置扔，球和人<b>同时</b>到了同一点。这一招叫<b>提前量</b>。<small>发射去火星一模一样——要朝火星<b>将要在</b>的位置发射，这就是下一关「发射窗口」。</small>'},
+        whiff:{tag:'扑空了', t:'你朝他<b>现在</b>的位置扔，可球飞到时他早跑走了。<small>炸了？又一份数据。</small>'},
+        under:{tag:'差一点', t:'有想法！你提前了一点，但<b>提前量不够</b>——球从他<b>身后</b>擦过去了。<small>炸了？又一份数据。</small>'},
+        over:{tag:'扔过头了', t:'提前<b>太多</b>了！球先到了那个点，他还没跑到。<small>炸了？又一份数据。</small>'},
+        behind:{tag:'方向反了', t:'你朝他<b>身后</b>扔了——要朝他跑的<b>前方</b>提前才对。<small>炸了？又一份数据。</small>'}
+      }
+    },
+    en: {
+      title:'Lead the Target', titleEn:'传球训练', lang:'中',
+      back:'← Menu',
+      hook:"Musk: You <b>can't</b> aim at where Mars is now — by the time you arrive, it's long gone. It's like passing to a <b>running teammate</b>: throw to where they're <b>going to be</b>. First, land the pass on this field.",
+      throwBtn:'PASS!', newBtn:'New teammate',
+      aimBig:'Aim angle',
+      analogy:(dir)=>`Your teammate is running <span class="dirword">${dir}</span>. Ball speed is fixed — think how far he'll run in the seconds the ball is in the air, then decide where to throw.`,
+      dirRight:'right', dirLeft:'left',
+      chipNow:'aimed at him now', chipLead:(n)=>`leading ${n}°`, chipBehind:(n)=>`behind ${n}°`,
+      tickNow:'him now', tickLead:'the lead',
+      hintStart:'Slide to aim, then press PASS. See if he\'s still there when the ball arrives.',
+      hintHelp:'Musk: Don\'t aim where he <b>is</b> — aim where he\'s <b>going</b>. (the dashed ring is the lead point)',
+      badgeLocked:'Badge locked: land a pass in your teammate\'s hands to earn "Lead Instinct".',
+      badgeEarned:'Badge earned: "Lead Instinct" — you aim at where they WILL be, not where they are.',
+      v:{
+        caught:{tag:'Caught it 🎉', t:'Nice! You threw to where he <b>would be</b> — ball and runner reached the same spot at the <b>same time</b>. That trick is called <b>leading the target</b>.<small>Going to Mars is exactly this — you launch at where Mars <b>will be</b>. That\'s the next level, "Launch Window".</small>'},
+        whiff:{tag:'Whiff!', t:'You threw to where he is <b>now</b> — but by the time the ball arrived, he\'d run off.<small>Boom? Another data point.</small>'},
+        under:{tag:'Just short', t:'Good idea! You led him a little, but <b>not far enough</b> — the ball passed <b>behind</b> him.<small>Boom? Another data point.</small>'},
+        over:{tag:'Overshot', t:'You led <b>too far</b>! The ball reached the spot before he did.<small>Boom? Another data point.</small>'},
+        behind:{tag:'Wrong way', t:'You threw <b>behind</b> him — you have to lead <b>in front</b>, the way he\'s running.<small>Boom? Another data point.</small>'}
+      }
+    }
+  };
+  let lang = 'zh';
+
+  // ============================================================
+  //  DOM
+  // ============================================================
+  const canvas   = document.getElementById('c');
+  const ctx      = canvas.getContext('2d');
+  const slider   = document.getElementById('slider');
+  const aimBig   = document.getElementById('aimBig');
+  const leadChip = document.getElementById('leadChip');
+  const analogyEl= document.getElementById('analogy');
+  const throwBtn = document.getElementById('throwBtn');
+  const newBtn   = document.getElementById('newBtn');
+  const verdictEl= document.getElementById('verdict');
+  const badgeEl  = document.getElementById('badge');
+  const badgeText= document.getElementById('badgeText');
+  const ticksEl  = document.getElementById('ticks');
+  const hintEl   = document.getElementById('hint');
+
+  // ============================================================
+  //  storage / badge
+  // ============================================================
+  const BADGE_KEY = 'mg.badge.pass-the-ball';
+  let earned = false;
+  try{ earned = localStorage.getItem(BADGE_KEY) === '1'; }catch(e){}
+
+  // ============================================================
+  //  layout + geometry
+  // ============================================================
+  let W=0, H=0, dpr=1;
+  const FY = 0.24;                 // runner's lane height (fraction of H)
+  let TX=0, TY=0;                  // thrower position (px)
+  let VB=0;                        // ball speed (px/s)
+  let catchR=0;                    // catch radius (px)
+  let rP=14;                       // player draw radius (px)
+
+  // runner descriptor (fractions -> survives resize)
+  let runner = { fx:0.12, dir:1, spdFrac:0.12 };
+
+  // derived geometry (px), recomputed on spawn/resize
+  let rx=0, ry=0, vrx=0, tI=0, leadX=0, leadY=0, aimCurrent=0, aimLead=0;
+
+  // interaction / mode state
+  let mode='idle';                 // 'idle' | 'flight' | 'effect'
+  let aimA=0;                      // current aim angle (deg, 0 = straight up, + = right)
+  let missCount=0;
+  let helperShown=false;
+  let flight=null;                 // live/last flight snapshot
+  let effect=null;                 // particle effect
+  let curTick=null, leadTick=null;
+
+  // idle preview animation
+  let previewT=0, lastIdle=0, idleRunning=false;
+
+  // ============================================================
+  //  canvas sizing (DPR-aware, copied pattern from newton-cannon)
+  // ============================================================
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio||1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = W*dpr; canvas.height = H*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    computeGeom();
+    buildTicks();
+    draw();
+  }
+
+  // ---- angle helper: unit direction from aim angle (screen coords, y down) ----
+  function dirFromAngle(aDeg){ const a=aDeg*Math.PI/180; return {x:Math.sin(a), y:-Math.cos(a)}; }
+  function angleTo(px,py){ return Math.atan2(px-TX, -(py-TY)) * 180/Math.PI; }
+
+  // ---- compute geometry + the REAL constant-velocity intercept solution ----
+  function computeGeom(){
+    TX = W*0.5; TY = H*0.90;
+    VB = 0.28*H;                       // ball speed px/s
+    catchR = 0.055*Math.min(W,H);
+    rP = Math.max(10, 0.030*Math.min(W,H));
+    rx = runner.fx*W; ry = FY*H;
+    vrx = runner.dir * runner.spdFrac * W;   // runner velocity px/s (horizontal)
+
+    aimCurrent = angleTo(rx, ry);
+
+    // intercept: |D + Vr*t| = VB*t  ->  (|Vr|^2 - VB^2)t^2 + 2(D.Vr)t + |D|^2 = 0
+    const Dx = rx-TX, Dy = ry-TY;
+    const A = vrx*vrx - VB*VB;          // < 0
+    const B = 2*Dx*vrx;
+    const C = Dx*Dx + Dy*Dy;
+    const disc = B*B - 4*A*C;
+    tI = NaN;
+    if(disc >= 0){
+      const sq = Math.sqrt(disc);
+      const t1 = (-B+sq)/(2*A), t2 = (-B-sq)/(2*A);
+      tI = Math.max(t1, t2);           // exactly one root is positive
+    }
+    leadX = rx + vrx*tI; leadY = ry;
+    aimLead = angleTo(leadX, leadY);
+  }
+
+  // ---- spawn a runner with a solvable, on-field, watchable intercept ----
+  function spawnRunner(){
+    for(let i=0;i<80;i++){
+      const dir = Math.random()<0.5 ? 1 : -1;
+      const spdFrac = 0.10 + Math.random()*0.06;      // fraction of W per second
+      const fx = dir>0 ? (0.10+Math.random()*0.07) : (0.83+Math.random()*0.07);
+      runner = { fx, dir, spdFrac };
+      computeGeom();
+      if(isFinite(tI) && tI>1.5 && tI<4.6 &&
+         aimLead>-78 && aimLead<78 &&
+         leadX>0.07*W && leadX<0.93*W){ break; }
+    }
+    missCount=0; helperShown=false; flight=null; effect=null;
+    aimA = clamp(Math.round(aimCurrent), -80, 80);
+    slider.value = String(aimA);
+    buildTicks();
+    renderReadout();
+    hideVerdict();
+    hintEl.className='hintline';
+    hintEl.innerHTML = T[lang].hintStart;
+    startIdle();
+  }
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+  // ============================================================
+  //  drawing helpers
+  // ============================================================
+  function rr(x,y,w,h,r){
+    ctx.beginPath();
+    if(ctx.roundRect){ ctx.roundRect(x,y,w,h,r); }
+    else{
+      ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+      ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+    }
+  }
+  function emoji(ch,x,y,size,flip){
+    ctx.save();
+    ctx.translate(x,y);
+    if(flip) ctx.scale(-1,1);
+    ctx.font = size+'px "Apple Color Emoji","Segoe UI Emoji",serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(ch,0,0);
+    ctx.restore();
+  }
+
+  function drawField(){
+    const inset=8;
+    // grass gradient
+    const g = ctx.createLinearGradient(0,inset,0,H-inset);
+    g.addColorStop(0,'#1c7a41'); g.addColorStop(1,'#0e4022');
+    ctx.fillStyle=g; rr(inset,inset,W-2*inset,H-2*inset,14); ctx.fill();
+    // mowed stripes
+    ctx.save(); rr(inset,inset,W-2*inset,H-2*inset,14); ctx.clip();
+    const bands=8, bh=(H-2*inset)/bands;
+    for(let i=0;i<bands;i+=2){ ctx.fillStyle='rgba(255,255,255,.04)'; ctx.fillRect(inset,inset+i*bh,W-2*inset,bh); }
+    // lines
+    ctx.strokeStyle='rgba(255,255,255,.22)'; ctx.lineWidth=2;
+    ctx.strokeRect(inset+6,inset+6,W-2*inset-12,H-2*inset-12);
+    ctx.beginPath(); ctx.moveTo(inset,H*0.5); ctx.lineTo(W-inset,H*0.5); ctx.stroke();
+    ctx.beginPath(); ctx.arc(W/2,H*0.5,Math.min(W,H)*0.11,0,7); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawPathHint(alpha){
+    // dotted horizontal lane the runner travels along
+    ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle='#cfe6ff'; ctx.lineWidth=2; ctx.setLineDash([2,8]); ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0.05*W, FY*H); ctx.lineTo(0.95*W, FY*H); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+  }
+
+  function drawVelArrow(){
+    // arrow from the runner showing his direction (and speed via length)
+    const len = clamp(Math.abs(vrx)*0.9, rP*2.4, W*0.28);
+    const x0 = rx + runner.dir*rP*1.2, y0 = ry;
+    const x1 = rx + runner.dir*(rP*1.2+len), y1 = ry;
+    ctx.save(); ctx.strokeStyle='#ffd27f'; ctx.fillStyle='#ffd27f'; ctx.lineWidth=3; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1,y1); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x1-runner.dir*10,y1-6);
+    ctx.lineTo(x1-runner.dir*10,y1+6);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawAimRay(){
+    const u = dirFromAngle(aimA);
+    const len = Math.hypot(W,H);
+    ctx.save(); ctx.strokeStyle='rgba(255,140,66,.75)'; ctx.lineWidth=2.5; ctx.setLineDash([7,7]); ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(TX,TY); ctx.lineTo(TX+u.x*len, TY+u.y*len); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+  }
+
+  function drawLeadMarker(alpha){
+    // the "提前量 / lead" point — revealed only after some misses
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.strokeStyle='#ffd27f'; ctx.lineWidth=2; ctx.setLineDash([5,5]);
+    ctx.beginPath(); ctx.arc(leadX, leadY, catchR*1.15, 0, 7); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha=alpha*0.6;
+    emoji('🏃', leadX, leadY, rP*2.0, runner.dir<0);
+    ctx.globalAlpha=alpha;
+    ctx.fillStyle='#ffd27f'; ctx.font='12px -apple-system,sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='bottom';
+    ctx.fillText(T[lang].tickLead, leadX, leadY - catchR*1.4);
+    ctx.restore();
+  }
+
+  function drawThrower(){
+    // subtle shadow
+    ctx.save(); ctx.fillStyle='rgba(0,0,0,.3)';
+    ctx.beginPath(); ctx.ellipse(TX, TY+rP*0.7, rP*0.9, rP*0.4, 0,0,7); ctx.fill(); ctx.restore();
+    emoji('🤾', TX, TY, rP*2.2, false);
+  }
+
+  function drawRunner(x,y,running){
+    ctx.save(); ctx.fillStyle='rgba(0,0,0,.3)';
+    ctx.beginPath(); ctx.ellipse(x, y+rP*0.7, rP*0.9, rP*0.4, 0,0,7); ctx.fill(); ctx.restore();
+    if(running){ // little speed streaks behind
+      ctx.save(); ctx.strokeStyle='rgba(207,230,255,.5)'; ctx.lineWidth=2; ctx.lineCap='round';
+      for(let i=1;i<=3;i++){ ctx.globalAlpha=0.5/i;
+        ctx.beginPath(); ctx.moveTo(x-runner.dir*(rP*1.1+i*7), y-4+i*3);
+        ctx.lineTo(x-runner.dir*(rP*1.1+i*7+10), y-4+i*3); ctx.stroke(); }
+      ctx.restore();
+    }
+    emoji('🏃', x, y, rP*2.0, runner.dir<0);
+  }
+
+  function drawTrail(pts, color, width, alpha){
+    if(pts.length<2) return;
+    ctx.save(); ctx.strokeStyle=color; ctx.globalAlpha=alpha; ctx.lineWidth=width;
+    ctx.lineJoin='round'; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
+    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+    ctx.stroke(); ctx.restore();
+  }
+
+  function drawBall(x,y){
+    ctx.save(); ctx.shadowColor='#ff8c42'; ctx.shadowBlur=12;
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,rP*0.42,0,7); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawEffect(){
+    if(!effect) return;
+    const e = (performance.now()-effect.t0)/1000;
+    const p = clamp(e/(effect.dur/1000),0,1);
+    // expanding ring
+    ctx.save();
+    ctx.globalAlpha = (1-p)*0.8;
+    ctx.strokeStyle = effect.type==='catch' ? '#57d38c' : '#ff8c42';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(effect.x, effect.y, catchR*(0.6+2.4*p), 0, 7); ctx.stroke();
+    ctx.restore();
+    // particles
+    for(const q of effect.parts){
+      const px = q.x + q.vx*e, py = q.y + q.vy*e + 90*e*e;
+      ctx.save(); ctx.globalAlpha=(1-p); ctx.fillStyle=q.col;
+      ctx.beginPath(); ctx.arc(px,py,q.r,0,7); ctx.fill(); ctx.restore();
+    }
+    if(effect.type==='catch'){
+      ctx.save(); ctx.globalAlpha=1-p*0.4;
+      emoji('🎉', effect.x, effect.y - catchR*1.6, rP*1.8, false);
+      ctx.restore();
+    }
+  }
+
+  // ============================================================
+  //  master draw
+  // ============================================================
+  function draw(){
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,W,H);
+    // shake during a miss puff
+    if(effect && effect.type==='puff'){
+      const e=(performance.now()-effect.t0)/effect.dur;
+      if(e<0.4){ const s=(0.4-e)*14; ctx.translate((Math.random()-0.5)*s,(Math.random()-0.5)*s); }
+    }
+    drawField();
+
+    if(mode==='flight' || mode==='effect'){
+      drawPathHint(0.4);
+      if(helperShown) drawLeadMarker(0.5);
+      drawAimHelperFrozen();
+      drawTrail(flight.ballTrail, '#ff8c42', 3, 0.95);
+      drawThrower();
+      drawRunner(flight.rx, flight.ry, true);
+      drawBall(flight.bx, flight.by);
+      if(flight.caught){
+        ctx.save(); ctx.strokeStyle='#57d38c'; ctx.lineWidth=3;
+        ctx.beginPath(); ctx.arc(flight.rx, flight.ry, catchR, 0, 7); ctx.stroke(); ctx.restore();
+      }
+    } else {
+      drawPathHint(0.6);
+      if(helperShown) drawLeadMarker(0.9);
+      // preview ghost sliding along the lane, so the kid FEELS the motion
+      const gx = rx + vrx*previewT;
+      if(gx>-0.05*W && gx<1.05*W){
+        ctx.save(); ctx.globalAlpha=0.28; emoji('🏃', gx, ry, rP*1.8, runner.dir<0); ctx.restore();
+      }
+      drawVelArrow();
+      drawAimRay();
+      drawThrower();
+      drawRunner(rx, ry, false);
+    }
+    drawEffect();
+  }
+
+  function drawAimHelperFrozen(){
+    // faint frozen aim direction during flight
+    const u = dirFromAngle(flight.aim);
+    const len = Math.hypot(W,H);
+    ctx.save(); ctx.strokeStyle='rgba(255,140,66,.18)'; ctx.lineWidth=2; ctx.setLineDash([6,8]);
+    ctx.beginPath(); ctx.moveTo(TX,TY); ctx.lineTo(TX+u.x*len, TY+u.y*len); ctx.stroke();
+    ctx.setLineDash([]); ctx.restore();
+  }
+
+  // ============================================================
+  //  idle preview loop
+  // ============================================================
+  function startIdle(){
+    mode='idle';
+    if(!idleRunning){ idleRunning=true; lastIdle=0; requestAnimationFrame(idleLoop); }
+  }
+  function idleLoop(now){
+    if(mode!=='idle'){ idleRunning=false; return; }
+    if(!lastIdle) lastIdle=now;
+    let dt=(now-lastIdle)/1000; lastIdle=now; if(dt>0.05) dt=0.05;
+    previewT += dt;
+    const gx = rx + vrx*previewT;
+    if(gx < -0.06*W || gx > 1.06*W) previewT = 0;
+    draw();
+    requestAnimationFrame(idleLoop);
+  }
+
+  // ============================================================
+  //  throw + live intercept simulation (real constant velocities)
+  // ============================================================
+  let lastFrame=0;
+  function throwBall(){
+    if(mode==='flight') return;
+    computeGeom();
+    const u = dirFromAngle(aimA);
+    flight = {
+      bx:TX, by:TY, ux:u.x, uy:u.y, vb:VB,
+      rx:rx, ry:ry, vrx:vrx,
+      t:0, ballTrail:[[TX,TY]],
+      caught:false, aim:aimA, aimCur:aimCurrent, aimLead:aimLead
+    };
+    mode='flight'; idleRunning=false;
+    throwBtn.disabled=true; newBtn.disabled=true; slider.disabled=true;
+    hideVerdict();
+    lastFrame=0;
+    requestAnimationFrame(flightLoop);
+  }
+
+  function flightLoop(now){
+    if(mode!=='flight') return;
+    if(!lastFrame) lastFrame=now;
+    let dt=(now-lastFrame)/1000; lastFrame=now; if(dt>0.05) dt=0.05;
+    const f=flight;
+    f.t += dt;
+    f.bx += f.ux*f.vb*dt; f.by += f.uy*f.vb*dt;
+    f.rx += f.vrx*dt;
+    f.ballTrail.push([f.bx,f.by]);
+
+    const d = Math.hypot(f.bx-f.rx, f.by-f.ry);
+    let end=false;
+    if(f.t>0.06 && d < catchR){ f.caught=true; end=true; }
+    const m=0.12;
+    if(f.bx < -m*W || f.bx > (1+m)*W || f.by < -m*H || f.by > (1+m)*H) end=true;
+    if(f.rx < -m*W || f.rx > (1+m)*W) end=true;
+    if(f.t > 6) end=true;
+
+    draw();
+    if(end){ endFlight(); }
+    else{ requestAnimationFrame(flightLoop); }
+  }
+
+  function endFlight(){
+    const f=flight;
+    throwBtn.disabled=false; newBtn.disabled=false; slider.disabled=false;
+
+    let key, effType, ex, ey;
+    if(f.caught){
+      key='caught'; effType='catch'; ex=f.rx; ey=f.ry;
+    } else {
+      // classify the miss using aim vs the two reference angles
+      const s = Math.sign(f.aimLead - f.aimCur) || 1;   // motion side
+      const led = (f.aim - f.aimCur) * s;               // >0 = led correct direction
+      const L   = (f.aimLead - f.aimCur) * s;           // correct lead amount (>0)
+      if(Math.abs(f.aim - f.aimCur) <= 3) key='whiff';
+      else if(led < 0)          key='behind';
+      else if(led < L - 1)      key='under';
+      else                      key='over';
+      effType='puff'; ex=f.bx; ey=f.by;
+    }
+
+    showVerdict(key);
+    startEffect(effType, ex, ey);
+
+    if(f.caught){
+      earned = true;
+      try{ localStorage.setItem(BADGE_KEY,'1'); }catch(e){}
+      renderBadge();
+    } else {
+      missCount++;
+      if(missCount>=2 && !helperShown){
+        helperShown = true;
+        hintEl.className='hintline on';
+        hintEl.innerHTML = T[lang].hintHelp;
+      }
+      updateTickReveal();
+    }
+  }
+
+  function startEffect(type,x,y){
+    const parts=[];
+    const n = type==='catch'?20:12;
+    for(let i=0;i<n;i++){
+      const ang=Math.random()*Math.PI*2;
+      const sp = 50 + Math.random()*120;
+      const cols = type==='catch'
+        ? ['#ffd27f','#57d38c','#4aa3ff','#ff8c42']
+        : ['#ff8c42','#ffd27f','#ffffff'];
+      parts.push({
+        x, y,
+        vx:Math.cos(ang)*sp,
+        vy:Math.sin(ang)*sp - (type==='catch'?60:20),
+        col:cols[i%cols.length],
+        r:2+Math.random()*3
+      });
+    }
+    effect = { type, x, y, t0:performance.now(), dur:type==='catch'?1500:900, parts };
+    mode='effect'; idleRunning=false;
+    requestAnimationFrame(effLoop);
+  }
+  function effLoop(now){
+    if(!effect){ return; }
+    draw();
+    if(now - effect.t0 > effect.dur){ effect=null; startIdle(); return; }
+    requestAnimationFrame(effLoop);
+  }
+
+  // ============================================================
+  //  verdict
+  // ============================================================
+  let lastVerdictKey=null;
+  function showVerdict(key){
+    lastVerdictKey = key;
+    const vd = T[lang].v[key];
+    const cls = key==='caught' ? 'ok' : 'bad';
+    verdictEl.className = 'verdict show ' + cls;
+    verdictEl.innerHTML = `<span class="tag">${vd.tag}</span>${vd.t}`;
+  }
+  function hideVerdict(){ verdictEl.className='verdict'; }
+
+  // ============================================================
+  //  ticks (discovery: reveal after misses)
+  // ============================================================
+  function buildTicks(){
+    ticksEl.innerHTML='';
+    const min=+slider.min, max=+slider.max;
+    const mk=(val,label)=>{
+      const el=document.createElement('div'); el.className='tick';
+      el.style.left = clamp((val-min)/(max-min)*100,0,100)+'%';
+      el.innerHTML = `<b>${label}</b>`;
+      ticksEl.appendChild(el); return el;
+    };
+    curTick  = mk(aimCurrent, T[lang].tickNow);
+    leadTick = mk(aimLead,    T[lang].tickLead);
+    updateTickReveal();
+  }
+  function updateTickReveal(){
+    if(!curTick) return;
+    if(missCount>=1) curTick.classList.add('reveal');
+    if(helperShown) leadTick.classList.add('reveal');
+  }
+
+  // ============================================================
+  //  readout
+  // ============================================================
+  function renderReadout(){
+    aimBig.textContent = Math.round(aimA);
+    const led = aimA - aimCurrent;
+    const s = Math.sign(aimLead - aimCurrent) || 1;
+    let txt, on=false;
+    if(Math.abs(led) <= 3){ txt = T[lang].chipNow; on=true; }
+    else if(Math.sign(led)===s){ txt = T[lang].chipLead(Math.round(Math.abs(led))); }
+    else { txt = T[lang].chipBehind(Math.round(Math.abs(led))); }
+    leadChip.textContent = txt;
+    leadChip.className = 'chip' + (on?' on':'');
+    const dir = runner.dir>0 ? T[lang].dirRight : T[lang].dirLeft;
+    analogyEl.innerHTML = T[lang].analogy(dir);
+  }
+
+  function renderBadge(){
+    badgeEl.className = 'badge' + (earned?' earned':'');
+    badgeText.textContent = earned ? T[lang].badgeEarned : T[lang].badgeLocked;
+  }
+
+  // ============================================================
+  //  static text / language
+  // ============================================================
+  function renderStatic(){
+    const t=T[lang];
+    document.getElementById('title').textContent = t.title;
+    document.getElementById('titleEn').textContent = t.titleEn;
+    document.getElementById('langBtn').textContent = t.lang;
+    document.getElementById('back').textContent = t.back;
+    document.getElementById('hook').innerHTML = t.hook;
+    throwBtn.textContent = t.throwBtn;
+    newBtn.textContent = t.newBtn;
+    // hint: keep current help vs start message in the right language
+    if(hintEl.classList.contains('on')) hintEl.innerHTML = t.hintHelp;
+    else hintEl.innerHTML = t.hintStart;
+    document.documentElement.lang = lang;
+  }
+
+  // ============================================================
+  //  events
+  // ============================================================
+  slider.addEventListener('input', ()=>{
+    aimA = +slider.value;
+    renderReadout();
+    if(mode==='idle') draw();
+  });
+  throwBtn.addEventListener('click', throwBall);
+  newBtn.addEventListener('click', ()=>{ if(mode==='flight') return; spawnRunner(); });
+  document.getElementById('langBtn').addEventListener('click', ()=>{
+    lang = lang==='zh' ? 'en' : 'zh';
+    renderStatic(); renderReadout(); renderBadge(); buildTicks();
+    // refresh verdict text if one is showing
+    if(verdictEl.classList.contains('show') && lastVerdictKey){ showVerdict(lastVerdictKey); }
+    draw();
+  });
+  window.addEventListener('resize', resize);
+
+  // ============================================================
+  //  init
+  // ============================================================
+  renderStatic();
+  renderBadge();
+  resize();       // sizes canvas + computes geometry
+  spawnRunner();  // first teammate
+})();
+</script>
+</body>
+</html>
