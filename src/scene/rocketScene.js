@@ -20,7 +20,7 @@ export function createRocketScene(mount) {
   if (!mount.style.position) mount.style.position = 'relative'
   const stepLabel = document.createElement('div')
   stepLabel.className = 'scene-step'
-  stepLabel.style.cssText = 'position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:7px 18px;border-radius:22px;background:rgba(18,26,36,0.82);color:#eafaff;font:600 16px/1.3 "PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .35s;z-index:6;box-shadow:0 2px 10px rgba(0,0,0,.35)'
+  stepLabel.style.cssText = 'position:absolute;top:14px;left:50%;transform:translateX(-50%);max-width:min(560px,86vw);padding:7px 18px;border-radius:22px;background:rgba(18,26,36,0.82);color:#eafaff;font:600 16px/1.3 "PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.5px;white-space:normal;text-align:center;pointer-events:none;opacity:0;transition:opacity .35s;z-index:6;box-shadow:0 2px 10px rgba(0,0,0,.35)'
   mount.appendChild(stepLabel)
   function showStep(t) { stepLabel.textContent = t; stepLabel.style.opacity = '1' }
   function hideStep() { stepLabel.style.opacity = '0' }
@@ -1372,19 +1372,16 @@ export function createRocketScene(mount) {
     if (hoverHandler) hoverHandler(key ? { name: t(PARTS[key].name), desc: t(PARTS[key].desc), x, y } : null)
   }
   function onPointerMove(e) {
-    if (e.pointerType === 'touch') return          // 触屏改用点按（见 onPointerDown），不靠悬停
-    applyHover(pickAt(e), e.clientX, e.clientY)
+    applyHover(pickAt(e), e.clientX, e.clientY)     // 鼠标悬停 / 手指拖动都实时显示
   }
   function onPointerDown(e) {
-    if (e.pointerType !== 'touch') return           // 鼠标交给悬停
-    const key = pickAt(e)
-    applyHover(key && key !== hoverPart ? key : null, e.clientX, e.clientY)  // 点部件=固定显示；再点同处/点空白=收起
+    applyHover(pickAt(e), e.clientX, e.clientY)      // 点/触：点到部件即显示，点空白处收起（tap 也能触发）
   }
   function clearHover() { if (hoverPart !== null) applyHover(null) }
+  renderer.domElement.style.touchAction = 'none'    // 触屏点按不被浏览器手势取消
   renderer.domElement.addEventListener('pointermove', onPointerMove)
   renderer.domElement.addEventListener('pointerdown', onPointerDown)
-  renderer.domElement.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') clearHover() })
-  renderer.domElement.addEventListener('pointercancel', clearHover)
+  renderer.domElement.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') clearHover() })  // 只在鼠标移出画布时收起；触屏保持固定，方便看/转 3D 图
   function setHoverHandler(fn) { hoverHandler = fn }
 
   // 语言切换：强制重绘画布类标签（分舱剖面 / 一级发动机高亮）
