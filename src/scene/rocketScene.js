@@ -814,6 +814,9 @@ export function createRocketScene(mount) {
   let boosterDrop = 0   // 分离后一级下落量
   let ringDrop = 0      // 热分离后一级抛掉级间环的位移
   let armOpen = 0       // 筷子机械臂开合：0 合拢夹住 → 1 张开让路
+  let onDone = null     // 回收动画"真正夹住"后回调（按动画进度触发，不受帧率/真实时间影响）
+  let doneFired = false
+  function setOnDone(fn) { onDone = fn || null }
   function positionShip() {
     ship.position.y = (vehicle === 'stack' ? BOOSTER_TOP : 0) + sepGap
   }
@@ -911,6 +914,7 @@ export function createRocketScene(mount) {
 
   // 点"发射/继续"时触发：起飞→达标才升空（不够只喷火）；飞行→加推力；下降→软着陆或硬摔
   function play(success) {
+    doneFired = false
     if (!orbitFlightMode) rocket.rotation.z = 0   // 入轨横飞：保持水平，不要先回正再转横（避免抖一下）
     if (stage === 'liftoff') { rocketY = 0; anim = success ? { type: 'launch', t: 0, vy: 0 } : { type: 'pad-fire', t: 0 } }
     else if (stage === 'descent') {
@@ -1324,6 +1328,11 @@ export function createRocketScene(mount) {
     else if (stage === 'liftoff') armTarget = 0
     armOpen += (armTarget - armOpen) * 0.08
     applyArms(armOpen)
+    // 一级回收：助推器落到夹持位、机械臂合拢 = 真正"夹住"，此刻才回调（按动画进度，不看真实时间）
+    if (anim && anim.type === 'recover' && !doneFired && rocketY < 3.12 && armOpen < 0.06) {
+      doneFired = true
+      if (onDone) onDone()
+    }
     if (sepStep) showStep(sepStep); else hideStep()   // 级间分离步骤提示
 
     if (earthScroll) { earth.rotation.y -= earthScroll; clouds.rotation.y -= earthScroll * 1.04 }  // 入轨横飞：地球滑过，速度感
@@ -1399,5 +1408,5 @@ export function createRocketScene(mount) {
     if (stepLabel.parentNode) stepLabel.parentNode.removeChild(stepLabel)
   }
 
-  return { update, setStage, setVehicle, setRecovery, setPadRise, setEnvironment, setOrbitFlight, setGnc, play, setHighlight, setHoverHandler, dispose }
+  return { update, setStage, setVehicle, setRecovery, setPadRise, setEnvironment, setOrbitFlight, setGnc, play, setOnDone, setHighlight, setHoverHandler, dispose }
 }

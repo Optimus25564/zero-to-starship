@@ -110,18 +110,22 @@ export function startGame(mount) {
         ? t({ zh: `能飞——但${t(derived.chosen.note)} 换一种再试试？`, en: `It flies — but ${t(derived.chosen.note)} Try another?` })
         : t({ zh: '还差一点，调整参数再试试。', en: 'Not quite — tweak the parameters and try again.' })
     hud.setFeedback({ goalMet, message })
-    // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-    const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'full' ? 24500 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
-    // 发射后进入"运镜模式"：淡出 hook/公式/控制面板，让动画画面干净；动画演完再淡回（手机上尤其重要）
+    // 每关动画长度（真实时间估算）；回收关例外，改由场景"真正夹住"事件驱动
+    const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
+    // 发射后进入"运镜模式"：淡出 hook/公式/控制面板；动画演完再恢复并揭示里程碑
     mount.classList.add('playing')
-    clearTimeout(playTimer)
-    playTimer = setTimeout(() => mount.classList.remove('playing'), Math.max(delay, 1600))
-    if (goalMet) {
-      const stars = starsFor(derived)
-      progression.complete(current.id, stars)
-      const m = MILESTONES[current.milestoneId]
-      clearTimeout(milestoneTimer)
-      milestoneTimer = setTimeout(() => hud.showMilestone({ title: t(m.title), fact: t(m.fact), stars }), delay)
+    clearTimeout(playTimer); clearTimeout(milestoneTimer); scene.setOnDone(null)
+    const stars = starsFor(derived)
+    if (goalMet) progression.complete(current.id, stars)
+    const m = MILESTONES[current.milestoneId]
+    const reveal = () => { mount.classList.remove('playing'); if (goalMet && m) hud.showMilestone({ title: t(m.title), fact: t(m.fact), stars }) }
+    if (goalMet && current.recovery === 'full') {
+      // 三次点火回收动画很重、可能掉帧：等场景真正"筷子夹住"（按动画进度触发）后再过 1 秒揭示，绝不提前切断
+      scene.setOnDone(() => { clearTimeout(milestoneTimer); milestoneTimer = setTimeout(reveal, 1000) })
+      milestoneTimer = setTimeout(reveal, 45000)   // 兜底：极端情况也能收场
+    } else {
+      const revealAt = Math.max(goalMet ? delay : Math.min(delay, 5500), 1600)   // 失败时别让文字藏太久
+      milestoneTimer = setTimeout(reveal, revealAt)
     }
   }
 
@@ -136,7 +140,7 @@ export function startGame(mount) {
     current = level
 
     clearTimeout(milestoneTimer)   // 清掉上一关可能挂着的里程碑延时
-    clearTimeout(playTimer); mount.classList.remove('playing')   // 复位"运镜模式"（文字淡出）
+    clearTimeout(playTimer); mount.classList.remove('playing'); scene.setOnDone(null)   // 复位"运镜模式"（文字淡出）
     if (hud) hud.reset()
     // 首次创建 HUD；之后复用同一个 HUD，仅重建滑块
     if (!hud) {
