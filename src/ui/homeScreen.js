@@ -14,6 +14,7 @@ export function createHomeScreen(mount, onStart) {
       <div class="home-sub"></div>
       <div class="home-tagline">GATEWAY TO MARS</div>
       <button class="home-start"></button>
+      <div class="home-credit"></div>
     </div>`
   mount.appendChild(root)
 
@@ -29,10 +30,12 @@ export function createHomeScreen(mount, onStart) {
   const subEl = root.querySelector('.home-sub')
   const startBtn = root.querySelector('.home-start')
   const langBtn = root.querySelector('.home-lang')
+  const creditEl = root.querySelector('.home-credit')
   function relocalize() {
     titleEl.textContent = t({ zh: '从零到星舰', en: 'ZERO TO STARSHIP' })
     subEl.textContent = t({ zh: '一步步造出星舰，飞向火星', en: 'Build Starship, one step at a time — bound for Mars' })
     startBtn.textContent = t({ zh: '开始旅程 →', en: 'Start the journey →' })
+    creditEl.textContent = t({ zh: '灵感来自 Amie —— 未来的宇航员 ✨', en: 'Inspired by Amie — a future astronaut ✨' })
     langBtn.textContent = getLang() === 'zh' ? 'EN' : '中文'
   }
   relocalize()

@@ -10,7 +10,9 @@ import { createBlueprintOverlay } from '../overlay/blueprintOverlay.js'
 import { createHud } from '../ui/hud.js'
 import { createPartLabel } from '../ui/partLabel.js'
 import { createDiagramPanel } from '../ui/diagramPanel.js'
-import marsDrawingUrl from '../ui/mars-drawing.jpg'   // 结尾页:女儿画的火星
+import launchDrawingUrl from '../ui/amie-launch.jpg'   // Amie 的画:① 发射
+import spaceDrawingUrl from '../ui/amie-space.jpg'     // Amie 的画:② 太空
+import marsDrawingUrl from '../ui/mars-drawing.jpg'    // Amie 的画:③ 火星
 import { getLang, setLang, onLang, t } from '../i18n.js'
 
 export function startGame(mount) {
@@ -25,8 +27,12 @@ export function startGame(mount) {
   finaleArt.innerHTML = `
     <div class="finale-inner">
       <div class="finale-msg"></div>
-      <div class="finale-frame"><img src="${marsDrawingUrl}" alt="Mars, drawn by a young explorer" /></div>
-      <div class="finale-art-cap"></div>
+      <div class="finale-gallery">
+        <figure class="finale-piece"><div class="finale-frame"><img src="${launchDrawingUrl}" alt="Blast off, drawn by Amie" /></div><figcaption>“10·9·8… BLAST OFF!”</figcaption></figure>
+        <figure class="finale-piece"><div class="finale-frame"><img src="${spaceDrawingUrl}" alt="In space, drawn by Amie" /></div><figcaption>“few hours later”</figcaption></figure>
+        <figure class="finale-piece"><div class="finale-frame"><img src="${marsDrawingUrl}" alt="On Mars, drawn by Amie" /></div><figcaption>“Mars (look like moon but… oh well.)”</figcaption></figure>
+      </div>
+      <div class="finale-credit"></div>
       <button class="finale-back"></button>
     </div>`
   mount.appendChild(finaleArt)
@@ -173,12 +179,12 @@ export function startGame(mount) {
     finaleArt.classList.toggle('hidden', !level.finale)
     if (level.finale) {
       finaleArt.querySelector('.finale-msg').textContent = t({
-        zh: '🎉 你做到了 —— 从零造出星舰，一路飞到火星。',
-        en: '🎉 You made it — from nothing to a Starship, all the way to Mars.',
+        zh: '🎉 你做到了！这趟旅程，正是 Amie 画下的样子 ——',
+        en: '🎉 You made it! The whole journey — just as Amie drew it —',
       })
-      finaleArt.querySelector('.finale-art-cap').textContent = t({
-        zh: '“火星（看着像月球…不过没关系啦）” —— 一位未来宇航员画 🚀',
-        en: '“Mars (look like moon but… oh well.)” — by a future astronaut 🚀',
+      finaleArt.querySelector('.finale-credit').textContent = t({
+        zh: '本游戏灵感来自 Amie —— 一位未来的宇航员 ✨',
+        en: 'This game is inspired by Amie — a future astronaut ✨',
       })
       finaleArt.querySelector('.finale-back').textContent = t({ zh: '← 上一关', en: '← Back' })
     }
