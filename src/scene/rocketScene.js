@@ -19,6 +19,7 @@ export function createRocketScene(mount) {
   // 级间分离时的步骤提示条（① MECO ② 分离 ③ 二级点火 ④ 抛整流罩）
   if (!mount.style.position) mount.style.position = 'relative'
   const stepLabel = document.createElement('div')
+  stepLabel.className = 'scene-step'
   stepLabel.style.cssText = 'position:absolute;top:14px;left:50%;transform:translateX(-50%);padding:7px 18px;border-radius:22px;background:rgba(18,26,36,0.82);color:#eafaff;font:600 16px/1.3 "PingFang SC","Microsoft YaHei",sans-serif;letter-spacing:.5px;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .35s;z-index:6;box-shadow:0 2px 10px rgba(0,0,0,.35)'
   mount.appendChild(stepLabel)
   function showStep(t) { stepLabel.textContent = t; stepLabel.style.opacity = '1' }
@@ -1355,23 +1356,35 @@ export function createRocketScene(mount) {
     }
     return null
   }
-  function onPointerMove(e) {
+  function pickAt(e) {   // 射线检测：返回鼠标/手指所指的部件 key（没指到火箭则 null）
     const rect = renderer.domElement.getBoundingClientRect()
-    if (!rect.width || !rect.height) return
-    if (!rocket.visible) {   // 火箭被藏起来时（如 4.4 轨道示意图）不要再弹出箭体结构标注
-      if (hoverPart !== null) { hoverPart = null; if (hoverHandler) hoverHandler(null) }
-      return
-    }
+    if (!rect.width || !rect.height || !rocket.visible) return null
     ndc.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
     ndc.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.setFromCamera(ndc, camera)
     const hits = raycaster.intersectObject(rocket, true)
-    let key = null
-    for (const h of hits) { key = partAt(h.object, h.point); if (key) break }
-    hoverPart = key
-    if (hoverHandler) hoverHandler(key ? { name: t(PARTS[key].name), desc: t(PARTS[key].desc), x: e.clientX, y: e.clientY } : null)
+    for (const h of hits) { const k = partAt(h.object, h.point); if (k) return k }
+    return null
   }
+  function applyHover(key, x, y) {
+    hoverPart = key
+    mount.classList.toggle('inspecting', !!key)   // 检视部件时（手机上）把其它文字隐去，让标注/图解看得清
+    if (hoverHandler) hoverHandler(key ? { name: t(PARTS[key].name), desc: t(PARTS[key].desc), x, y } : null)
+  }
+  function onPointerMove(e) {
+    if (e.pointerType === 'touch') return          // 触屏改用点按（见 onPointerDown），不靠悬停
+    applyHover(pickAt(e), e.clientX, e.clientY)
+  }
+  function onPointerDown(e) {
+    if (e.pointerType !== 'touch') return           // 鼠标交给悬停
+    const key = pickAt(e)
+    applyHover(key && key !== hoverPart ? key : null, e.clientX, e.clientY)  // 点部件=固定显示；再点同处/点空白=收起
+  }
+  function clearHover() { if (hoverPart !== null) applyHover(null) }
   renderer.domElement.addEventListener('pointermove', onPointerMove)
+  renderer.domElement.addEventListener('pointerdown', onPointerDown)
+  renderer.domElement.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') clearHover() })
+  renderer.domElement.addEventListener('pointercancel', clearHover)
   function setHoverHandler(fn) { hoverHandler = fn }
 
   // 语言切换：强制重绘画布类标签（分舱剖面 / 一级发动机高亮）

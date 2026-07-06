@@ -28,9 +28,9 @@ export function startGame(mount) {
     <div class="finale-inner">
       <div class="finale-msg"></div>
       <div class="finale-gallery">
-        <figure class="finale-piece"><div class="finale-frame"><img src="${launchDrawingUrl}" alt="Blast off, drawn by Amie" /></div><figcaption>“10·9·8… BLAST OFF!”</figcaption></figure>
-        <figure class="finale-piece"><div class="finale-frame"><img src="${spaceDrawingUrl}" alt="In space, drawn by Amie" /></div><figcaption>“few hours later”</figcaption></figure>
-        <figure class="finale-piece"><div class="finale-frame"><img src="${marsDrawingUrl}" alt="On Mars, drawn by Amie" /></div><figcaption>“Mars (look like moon but… oh well.)”</figcaption></figure>
+        <figure class="finale-piece"><div class="finale-frame"><img src="${launchDrawingUrl}" alt="Blast off, drawn by Amie" /></div><figcaption></figcaption></figure>
+        <figure class="finale-piece"><div class="finale-frame"><img src="${spaceDrawingUrl}" alt="In space, drawn by Amie" /></div><figcaption></figcaption></figure>
+        <figure class="finale-piece"><div class="finale-frame"><img src="${marsDrawingUrl}" alt="On Mars, drawn by Amie" /></div><figcaption></figcaption></figure>
       </div>
       <div class="finale-credit"></div>
       <button class="finale-back"></button>
@@ -179,7 +179,11 @@ export function startGame(mount) {
     finaleArt.classList.toggle('hidden', !level.finale)
     if (level.finale) {
       finaleArt.querySelector('.finale-msg').textContent = t(level.hook)   // 复盘式收尾（从零到星舰的整段旅程）
-      finaleArt.querySelector('.finale-credit').textContent = 'inspired by Amie — a future astronaut'
+      const caps = finaleArt.querySelectorAll('.finale-piece figcaption')  // Amie 的三句配文（中文时翻译）
+      caps[0].textContent = t({ zh: '“10·9·8…发射！”', en: '“10·9·8… BLAST OFF!”' })
+      caps[1].textContent = t({ zh: '“几小时之后……”', en: '“few hours later”' })
+      caps[2].textContent = t({ zh: '“火星（看着像月球…不过没关系啦）”', en: '“Mars (look like moon but… oh well.)”' })
+      finaleArt.querySelector('.finale-credit').textContent = t({ zh: '🎂 Amie，八岁生日快乐！', en: '🎂 Happy 8th birthday, Amie!' })
       finaleArt.querySelector('.finale-back').textContent = t({ zh: '← 上一关', en: '← Back' })
     }
     if (level.finale) {
