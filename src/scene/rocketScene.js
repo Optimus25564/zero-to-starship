@@ -357,11 +357,33 @@ export function createRocketScene(mount) {
     return g
   }
   const astronaut = makeAstronaut(); astronaut.position.set(2.6, 0, 3.2); astronaut.rotation.y = -0.6; marsScene.add(astronaut)
-  // 小旗（红旗）
-  const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.2, 8), new THREE.MeshStandardMaterial({ color: 0xdedede, metalness: 0.6, roughness: 0.4 }))
-  flagPole.position.set(3.5, 0.6, 3.2); marsScene.add(flagPole)
-  const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.32), new THREE.MeshStandardMaterial({ color: 0xcf3b3b, roughness: 0.8, side: THREE.DoubleSide }))
-  flag.position.set(3.76, 1.05, 3.2); marsScene.add(flag)
+  // 火星探测器（rover）+ 插在上面的小红旗 —— 呼应女儿画里"左边插旗子的火星探测器"
+  function makeRover() {
+    const g = new THREE.Group()
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd9c9a8, metalness: 0.3, roughness: 0.6 })
+    const dark = new THREE.MeshStandardMaterial({ color: 0x2a2f38, metalness: 0.4, roughness: 0.6 })
+    const gold = new THREE.MeshStandardMaterial({ color: 0xc9a227, metalness: 0.6, roughness: 0.4 })
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.32, 0.6), bodyMat); body.position.y = 0.34; g.add(body)
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.04, 0.7), gold); deck.position.y = 0.52; g.add(deck)   // 太阳能板顶盖
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 8), dark); mast.position.set(0.3, 0.75, 0); g.add(mast)
+    const cam = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.12), dark); cam.position.set(0.3, 0.99, 0); g.add(cam)  // 相机头
+    const wheelGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.1, 14)
+    for (const wx of [-0.32, 0, 0.32]) for (const wz of [-0.32, 0.32]) {
+      const w = new THREE.Mesh(wheelGeo, dark); w.rotation.x = Math.PI / 2; w.position.set(wx, 0.16, wz); g.add(w)
+    }
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.8, 8), new THREE.MeshStandardMaterial({ color: 0xe8e8e8, metalness: 0.5, roughness: 0.4 }))
+    pole.position.set(-0.36, 0.86, 0); g.add(pole)
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.26), new THREE.MeshStandardMaterial({ color: 0xcf3b3b, roughness: 0.8, side: THREE.DoubleSide }))
+    flag.position.set(-0.15, 1.12, 0); g.add(flag)
+    return g
+  }
+  const rover = makeRover(); rover.position.set(0.2, 0, 4.6); rover.rotation.y = -0.5; marsScene.add(rover)
+  // 环形山（她画里地表上一个个小圆圈）
+  const craterMat = new THREE.MeshBasicMaterial({ color: 0x7a3a24, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+  for (const [cx, cz, cr] of [[-5, 6, 0.9], [6, 7, 1.3], [-8, 2, 0.7], [9, 4, 1.0], [2, 9, 0.6], [-3, 8, 0.8]]) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(cr * 0.68, cr, 24), craterMat)
+    ring.rotation.x = -Math.PI / 2; ring.position.set(cx, 0.02, cz); marsScene.add(ring)
+  }
 
   const chopArms = tower.userData.arms
   const ARM_GRIP = 0.62, ARM_OPEN_EXTRA = 1.25   // 合拢夹持 vs 张开让路的臂间距

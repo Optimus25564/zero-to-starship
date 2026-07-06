@@ -10,6 +10,7 @@ import { createBlueprintOverlay } from '../overlay/blueprintOverlay.js'
 import { createHud } from '../ui/hud.js'
 import { createPartLabel } from '../ui/partLabel.js'
 import { createDiagramPanel } from '../ui/diagramPanel.js'
+import marsDrawingUrl from '../ui/mars-drawing.jpg'   // 结尾页:女儿画的火星
 import { getLang, setLang, onLang, t } from '../i18n.js'
 
 export function startGame(mount) {
@@ -18,12 +19,18 @@ export function startGame(mount) {
   const overlay = createBlueprintOverlay(mount)
   const partLabel = createPartLabel(mount)
   const diagramPanel = createDiagramPanel(mount)   // 悬停火箭浮出的剖面/3D 图
+  // 结尾页:把女儿画的火星裱起来展示（默认隐藏，仅 finale 关卡显示）
+  const finaleArt = document.createElement('div')
+  finaleArt.className = 'finale-art hidden'
+  finaleArt.innerHTML = `<img src="${marsDrawingUrl}" alt="Mars, drawn by a young explorer" /><div class="finale-art-cap"></div>`
+  mount.appendChild(finaleArt)
   scene.setHoverHandler((info) => {
     if (info) partLabel.show(info); else partLabel.hide()
     diagramPanel.setHoverVisible(!!info)
   })
 
   let milestoneTimer = null   // 里程碑卡的延时器：换关/重发时清掉，防止上一关的卡串到下一关
+  let playTimer = null        // 发射后"运镜模式"(淡出文字)的恢复延时器
 
   // 语言开关（中 / EN）
   const langBtn = document.createElement('button')
@@ -92,12 +99,16 @@ export function startGame(mount) {
         ? t({ zh: `能飞——但${t(derived.chosen.note)} 换一种再试试？`, en: `It flies — but ${t(derived.chosen.note)} Try another?` })
         : t({ zh: '还差一点，调整参数再试试。', en: 'Not quite — tweak the parameters and try again.' })
     hud.setFeedback({ goalMet, message })
+    // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
+    const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'full' ? 27000 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
+    // 发射后进入"运镜模式"：淡出 hook/公式/控制面板，让动画画面干净；动画演完再淡回（手机上尤其重要）
+    mount.classList.add('playing')
+    clearTimeout(playTimer)
+    playTimer = setTimeout(() => mount.classList.remove('playing'), Math.max(delay, 1600))
     if (goalMet) {
       const stars = starsFor(derived)
       progression.complete(current.id, stars)
       const m = MILESTONES[current.milestoneId]
-      // 起飞/着陆关：先让动画演一会儿，再弹里程碑卡（"发射出去…接着讲"）
-      const delay = current.gnc ? 6000 : current.orbitFlight === 'insert' ? 26000 : current.orbitFlight === 'reach' ? 6000 : current.recovery === 'full' ? 27000 : current.recovery === 'reentry' ? 7000 : current.recovery === 'sea' ? 6000 : current.stage === 'liftoff' ? 5200 : current.stage === 'descent' ? 5500 : current.stage === 'separate' ? 10500 : current.padRise ? 3600 : 0
       clearTimeout(milestoneTimer)
       milestoneTimer = setTimeout(() => hud.showMilestone({ title: t(m.title), fact: t(m.fact), stars }), delay)
     }
@@ -114,6 +125,7 @@ export function startGame(mount) {
     current = level
 
     clearTimeout(milestoneTimer)   // 清掉上一关可能挂着的里程碑延时
+    clearTimeout(playTimer); mount.classList.remove('playing')   // 复位"运镜模式"（文字淡出）
     if (hud) hud.reset()
     // 首次创建 HUD；之后复用同一个 HUD，仅重建滑块
     if (!hud) {
@@ -148,6 +160,13 @@ export function startGame(mount) {
 
     if (interactionMod) { interactionMod.destroy(); interactionMod = null }
     hud.setLaunchVisible(!level.finale)   // 结尾页没有"发射"，就一张火星合影
+    finaleArt.classList.toggle('hidden', !level.finale)
+    if (level.finale) {
+      finaleArt.querySelector('.finale-art-cap').textContent = t({
+        zh: '“火星（看着像月球…不过没关系啦）” —— 送给未来的火星旅行者 🚀',
+        en: '“Mars (look like moon but… oh well.)” — for a future Mars explorer 🚀',
+      })
+    }
     if (level.finale) {
       params = {}
     } else if (level.interaction === 'choice') {

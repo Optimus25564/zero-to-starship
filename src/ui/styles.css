@@ -83,6 +83,19 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
 .d3d-legend { margin-top: 12px; font-size: 13px; color: #bcd0e6; line-height: 1.7; text-align: center; }
 .d3d-legend b { color: #eaf2ff; }
 
+/* ---- 发射时“运镜模式”：淡出文字/控件，把画面让给动画；动画演完自动淡回 ---- */
+.hud-hook, .hud-panel, .bp-formula, .bp-arrows { transition: opacity .4s ease; }
+.playing .hud-hook, .playing .hud-panel, .playing .bp-formula, .playing .bp-arrows { opacity: 0; pointer-events: none; }
+
+/* ---- 结尾页：女儿画的火星（裱框展示） ---- */
+.finale-art { position: fixed; top: 50%; right: 4vw; transform: translateY(-50%) rotate(-2.5deg); z-index: 30;
+  width: min(42vw, 460px); background: #fdfdf7; padding: 12px 12px 10px; border-radius: 4px;
+  box-shadow: 0 20px 55px rgba(0,0,0,.55); pointer-events: none; }
+.finale-art.hidden { display: none; }
+.finale-art img { display: block; width: 100%; height: auto; border-radius: 2px; }
+.finale-art-cap { margin-top: 9px; text-align: center; font-size: 13px; line-height: 1.45; color: #4a4a48;
+  font-family: "PingFang SC", system-ui, sans-serif; }
+
 /* ============ 手机 / 窄屏适配 ============ */
 /* 目标：文案(顶部 hook + 底部控制面板)压扁到上下两条，中间留出一整条给 3D 动画，不挡住火箭。 */
 @media (max-width: 640px) {
@@ -109,8 +122,11 @@ body { margin: 0; font-family: system-ui, "PingFang SC", sans-serif; color: #e6e
   .diagram-panel { top: auto; bottom: 0; left: 0; right: 0; width: 100%; max-width: 100%;
     height: auto; max-height: 64%; border-left: 0; border-top: 1px solid #2f6bff; padding: 16px 16px 20px; }
   .diagram-panel.hidden { transform: translateY(103%); }
-  .diagram-hint { top: auto; bottom: 10px; right: 8px; left: 8px; text-align: center; }
+  .diagram-hint { display: none; }                        /* 手机无悬停，隐藏这条鼠标提示（也避免和面板重叠） */
   .home-lang { top: 10px; right: 10px; }
+  /* 结尾页的画：居中偏上，别压住底部通关文案 */
+  .finale-art { top: 45%; left: 50%; right: auto; transform: translate(-50%, -50%) rotate(-2deg); width: min(82vw, 340px); }
+  .finale-art-cap { font-size: 12px; }
 }
 
 /* 横放的手机(矮屏)：进一步压低上下条，保住中间的动画带 */
