@@ -1190,8 +1190,8 @@ export function createRocketScene(mount) {
           morphTransfer(1); transferLine.material.opacity = 0.95; circleLine.material.opacity = 0.15
           perigeeMark.material.opacity = 0; perigeeLabel.material.opacity = 0; apogeeMark.material.opacity = 0.5
           dSat.visible = true
-          const dp = Math.min(1, (it - 22.0) / 3.5)
-          dSat.position.set(dShip.position.x + 0.4 + dp * 1.9, dShip.position.y - 0.2 - dp * 0.5, 0)  // 侧向缓缓分离飘走
+          const dp = Math.min(1, (it - 22.0) / 1.5)
+          dSat.position.set(dShip.position.x + 0.4 + dp * 2.0, dShip.position.y - 0.2 - dp * 0.55, 0)  // 侧向弹出分离（干脆些）
           dSat.rotation.z += 0.02
           sepStep = t({ zh: '⑤ 载荷释放：在稳定的圆轨道上把卫星放出去 → 独立绕地飞行 ✅', en: '⑤ Payload deploy: release the satellite onto the stable circular orbit → it flies on its own ✅' })
         }
