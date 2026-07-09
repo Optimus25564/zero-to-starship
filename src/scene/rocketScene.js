@@ -960,10 +960,17 @@ export function createRocketScene(mount) {
     else { rocketY = 0; anim = { type: 'pad-fire', t: 0 } }
   }
 
+  let _prevNow = 0
   function tick() {
     if (!running) return
     requestAnimationFrame(tick)
-    time += 0.016
+    // 用真实经过时间推进动画（不再假设 60fps）：手机掉帧时动画不会变慢，讲解卡也不会提前弹
+    const _now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+    let dt = _prevNow ? (_now - _prevNow) / 1000 : 0.016
+    _prevNow = _now
+    if (!(dt > 0)) dt = 0.016
+    if (dt > 0.1) dt = 0.1                 // 掉帧/切后台时别一次跳太多
+    time += dt
 
     let flameThrust = state.thrust || 0
     let shipThrust = 0        // 二级尾焰（分离后点火）
@@ -973,7 +980,7 @@ export function createRocketScene(mount) {
     let gimbal = 0            // 尾焰摆动矢量角（GNC 姿控修正；0=正下方）
 
     if (anim) {
-      anim.t += 0.016
+      anim.t += dt
       if (anim.type === 'separate') {
         // 星舰热分离 4 步慢动作：① 一级关大部分主机 → ② 二级点火(热分离,还没分开就点火) → ③ 级间分离 → ④ 一级抛级间环·掉头
         const at = anim.t   // 注意：不要用变量名 t，会遮蔽 i18n 的 t()
